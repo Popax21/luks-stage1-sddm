@@ -1,0 +1,12 @@
+[package]
+name = "luks-stage1-sddm-daemon"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow = "1.0.99"
+gethostname = "1.0.2"
+inotify = { version = "0.11.0", default-features = false }
+rust-ini = "0.21.1"
+smol = "2.0.2"
+zeroize = { version = "1.8.1", features = ["std"] }

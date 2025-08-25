@@ -1,0 +1,5 @@
+{
+    "rust-analyzer.server.path": "rust-analyzer",
+    "rust-analyzer.cargo.features": "all",
+    "rust-analyzer.check.command": "clippy"
+}

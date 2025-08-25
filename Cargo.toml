@@ -1,0 +1,10 @@
+[workspace]
+resolver = "2"
+members = ["sddm-daemon"]
+
+[workspace.metadata.crane]
+name = "luks-stage1-sddm"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"

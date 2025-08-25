@@ -1,0 +1,24 @@
+{
+  pkgs,
+  lib,
+  craneLib,
+}:
+lib.makeScope pkgs.newScope (self: {
+  inherit craneLib;
+  buildWorkspaceCrate = self.callPackage nix/buildWorkspaceCrate.nix {};
+
+  cargoArtifacts = craneLib.buildDepsOnly {
+    src = ./..;
+    strictDeps = true;
+  };
+
+  luks-stage1-sddm = craneLib.buildPackage {
+    src = ./..;
+    strictDeps = true;
+    inherit (self) cargoArtifacts;
+
+    EXE_SDDM_GREETER = lib.getExe' pkgs.kdePackages.sddm "sddm-greeter-qt6";
+    EXE_PKEXEC = lib.getExe' pkgs.polkit "pkexec";
+    EXE_REPLY_PASSWORD = "${pkgs.systemd}/lib/systemd/systemd-reply-password";
+  };
+})
