@@ -101,15 +101,18 @@ impl PasswordRequest {
 
     pub async fn reply(self, password: Option<Zeroizing<Box<str>>>) {
         async fn inner(socket: PathBuf, password: Option<Zeroizing<Box<str>>>) -> Result<()> {
-            //Don't write into the socket directly; instead pkexec
-            //systemd-reply-password to gain the permissions to do so
-            let mut child = Command::new(option_env!("EXE_PKEXEC").unwrap_or("pkexec"))
-                .arg(option_env!("EXE_REPLY_PASSWORD").unwrap_or("systemd-reply-password"))
-                .arg(if password.is_some() { "1" } else { "0" })
-                .arg(socket)
-                .stdin(Stdio::piped())
-                .spawn()
-                .context("failed to pkexec systemd-reply-password")?;
+            //Don't write into the socket directly; instead run
+            //systemd-reply-password
+            // - we don't use pkexec since it's not present in the initrd, but
+            //   we still don't write into the socket ourselves since the reply
+            //   program might be a wrapper with setuid permissions
+            let mut child =
+                Command::new(option_env!("EXE_REPLY_PASSWORD").unwrap_or("systemd-reply-password"))
+                    .arg(if password.is_some() { "1" } else { "0" })
+                    .arg(socket)
+                    .stdin(Stdio::piped())
+                    .spawn()
+                    .context("failed to run systemd-reply-password")?;
 
             if let Some(password) = password {
                 child
