@@ -1,14 +1,16 @@
-use std::{path::Path, process::ExitCode};
+use std::{path::Path, process::ExitCode, time::Duration};
 
 mod control_server;
 mod password_agent;
 mod sddm_config;
 
 use self::{
-    control_server::greeter_control_server, password_agent::PasswordRequest,
+    control_server::{GreeterController, greeter_control_server},
+    password_agent::PasswordRequest,
     sddm_config::SddmConfig,
 };
 use smol::{process::Command, stream::StreamExt};
+use zeroize::Zeroizing;
 
 fn main() -> ExitCode {
     //Parse the SDDM config file we're given
@@ -48,7 +50,7 @@ fn main() -> ExitCode {
         let socket_path =
             std::env::temp_dir().join(format!("stage1-sddm-greeter-{}", std::process::id()));
 
-        let control_server = smol::spawn(greeter_control_server(socket_path.clone()));
+        let control_server = smol::spawn(greeter_control_server(socket_path.clone(), Controller));
 
         //Start the SDDM greeter
         let mut cmd = Command::new(option_env!("EXE_SDDM_GREETER").unwrap_or("sddm-greeter-qt6"));
@@ -75,4 +77,43 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     })
+}
+
+struct Controller;
+impl GreeterController for Controller {
+    async fn login(
+        &self,
+        user: &str,
+        password: Zeroizing<Box<str>>,
+        mut msg_sender: impl FnMut(&str),
+    ) -> bool {
+        msg_sender("Unlocking...");
+        smol::Timer::after(Duration::from_secs(3)).await;
+        false
+    }
+
+    fn can_shutdown(&self) -> bool {
+        true
+    }
+    fn shutdown(&self) {}
+
+    fn can_reboot(&self) -> bool {
+        true
+    }
+    fn reboot(&self) {}
+
+    fn can_suspend(&self) -> bool {
+        true
+    }
+    fn suspend(&self) {}
+
+    fn can_hibernate(&self) -> bool {
+        false
+    }
+    fn hibernate(&self) {}
+
+    fn can_hybrid_sleep(&self) -> bool {
+        false
+    }
+    fn hybrid_sleep(&self) {}
 }

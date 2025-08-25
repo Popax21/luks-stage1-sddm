@@ -99,8 +99,8 @@ impl PasswordRequest {
         })
     }
 
-    pub async fn reply(self, password: Option<Zeroizing<String>>) {
-        async fn inner(socket: PathBuf, password: Option<Zeroizing<String>>) -> Result<()> {
+    pub async fn reply(self, password: Option<Zeroizing<Box<str>>>) {
+        async fn inner(socket: PathBuf, password: Option<Zeroizing<Box<str>>>) -> Result<()> {
             //Don't write into the socket directly; instead pkexec
             //systemd-reply-password to gain the permissions to do so
             let mut child = Command::new(option_env!("EXE_PKEXEC").unwrap_or("pkexec"))

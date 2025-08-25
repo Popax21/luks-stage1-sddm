@@ -20,5 +20,7 @@ lib.makeScope pkgs.newScope (self: {
     EXE_SDDM_GREETER = lib.getExe' pkgs.kdePackages.sddm "sddm-greeter-qt6";
     EXE_PKEXEC = lib.getExe' pkgs.polkit "pkexec";
     EXE_REPLY_PASSWORD = "${pkgs.systemd}/lib/systemd/systemd-reply-password";
+
+    meta.mainProgram = "luks-stage1-sddm-daemon";
   };
 })
