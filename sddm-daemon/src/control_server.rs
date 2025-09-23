@@ -31,9 +31,7 @@ pub trait GreeterController: Send + Sync + 'static {
     fn hybrid_sleep(&self);
 }
 
-pub async fn greeter_control_server(socket_path: PathBuf, controller: impl GreeterController) {
-    let controller = Arc::new(controller);
-
+pub async fn greeter_control_server(socket_path: PathBuf, controller: Arc<impl GreeterController>) {
     //Bind the socket and accept any connections from greeters
     let socket = UnixListener::bind(&socket_path).expect("failed to bind greeter control socket");
 
@@ -49,7 +47,7 @@ pub async fn greeter_control_server(socket_path: PathBuf, controller: impl Greet
         conns.push(smol::spawn(async move {
             println!("accepted greeter control socket connection {conn_id}");
             if let Err(err) = greeter_control_connection(conn, controller).await {
-                eprintln!("failed to read message from greeter connection {conn_id}: {err:?}");
+                eprintln!("failed to handle greeter connection {conn_id}: {err:?}");
             } else {
                 println!("greeter control socket connection {conn_id} was closed");
             }

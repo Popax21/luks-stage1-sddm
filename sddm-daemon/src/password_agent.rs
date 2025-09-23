@@ -99,42 +99,36 @@ impl PasswordRequest {
         })
     }
 
-    pub async fn reply(self, password: Option<Zeroizing<Box<str>>>) {
-        async fn inner(socket: PathBuf, password: Option<Zeroizing<Box<str>>>) -> Result<()> {
-            //Don't write into the socket directly; instead run
-            //systemd-reply-password
-            // - we don't use pkexec since it's not present in the initrd, but
-            //   we still don't write into the socket ourselves since the reply
-            //   program might be a wrapper with setuid permissions
-            let mut child =
-                Command::new(option_env!("EXE_REPLY_PASSWORD").unwrap_or("systemd-reply-password"))
-                    .arg(if password.is_some() { "1" } else { "0" })
-                    .arg(socket)
-                    .stdin(Stdio::piped())
-                    .spawn()
-                    .context("failed to run systemd-reply-password")?;
+    pub async fn reply(self, password: Option<Zeroizing<Box<str>>>) -> Result<()> {
+        //Don't write into the socket directly; instead run
+        //systemd-reply-password
+        // - we don't use pkexec since it's not present in the initrd, but
+        //   we still don't write into the socket ourselves since the reply
+        //   program might be a wrapper with setuid permissions
+        let mut child =
+            Command::new(option_env!("EXE_REPLY_PASSWORD").unwrap_or("systemd-reply-password"))
+                .arg(if password.is_some() { "1" } else { "0" })
+                .arg(self.socket_path)
+                .stdin(Stdio::piped())
+                .spawn()
+                .context("failed to run systemd-reply-password")?;
 
-            if let Some(password) = password {
-                child
-                    .stdin
-                    .as_mut()
-                    .unwrap()
-                    .write_all(password.as_bytes())
-                    .await
-                    .context("failed to write password to stdin")?;
-            };
+        if let Some(password) = password {
+            child
+                .stdin
+                .as_mut()
+                .unwrap()
+                .write_all(password.as_bytes())
+                .await
+                .context("failed to write password to stdin")?;
+        };
 
-            let status = child.status().await?;
-            ensure!(
-                status.success(),
-                "systemd-reply-password exited with status {status}"
-            );
+        let status = child.status().await?;
+        ensure!(
+            status.success(),
+            "systemd-reply-password exited with status {status}"
+        );
 
-            Ok(())
-        }
-
-        if let Err(err) = inner(self.socket_path, password).await {
-            eprintln!("failed to reply to password request: {err:?}")
-        }
+        Ok(())
     }
 }
