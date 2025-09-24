@@ -8,6 +8,7 @@
   };
 
   outputs = {
+    self,
     nixpkgs,
     flake-utils,
     crane,
@@ -45,6 +46,8 @@
         ];
         propagatedBuildInputs = [flakePkgs.cargoArtifacts]; # - keep our cargo artifacts alive as part of the direnv GC root
       };
+
+      apps.devVM = import test/dev_vm.nix {inherit self nixpkgs system;};
     }))
     // rec {
       overlays.default = final: prev: {

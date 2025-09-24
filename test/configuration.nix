@@ -1,0 +1,68 @@
+{
+  lib,
+  pkgs,
+  config,
+  flake,
+  modulesPath,
+  ...
+}: {
+  imports = [
+    "${modulesPath}/virtualisation/qemu-vm.nix"
+    flake.nixosModules.default
+  ];
+  config = {
+    system.stateVersion = "24.05";
+
+    #Configure the VM
+    nix.enable = false;
+    virtualisation = {
+      diskImage = null;
+      graphics = true;
+      restrictNetwork = true;
+    };
+    networking.dhcpcd.enable = false;
+
+    #Setup the testing user
+    users.users.tester = {
+      isNormalUser = true;
+      password = "testing";
+      extraGroups = ["wheel"];
+    };
+
+    #Setup a testing LUKS-encrypted drive
+    boot.initrd = {
+      systemd = {
+        enable = true;
+        emergencyAccess = true;
+        storePaths = [pkgs.coreutils-full pkgs.util-linux pkgs.cryptsetup];
+
+        services.test-drive-setup = {
+          before = ["cryptsetup-pre.target"];
+          requiredBy = ["sysinit.target"];
+
+          unitConfig.DefaultDependencies = false;
+          serviceConfig.Type = "oneshot";
+          serviceConfig.RemainAfterExit = true;
+
+          script = ''
+            truncate -s 100M /tmp/test-drive
+            echo -ne ${lib.escapeShellArg config.users.users.tester.password} \
+              | cryptsetup luksFormat --batch-mode --force-password --type luks2 /tmp/test-drive -
+            losetup /dev/loop0 /tmp/test-drive
+          '';
+          path = [pkgs.coreutils-full pkgs.util-linux pkgs.cryptsetup];
+        };
+        targets.cryptsetup.requiredBy = ["sysinit.target"];
+      };
+      kernelModules = ["loop"];
+
+      # - has to be stronger than mkVMOverride (priority 10)
+      luks.devices = lib.mkOverride 5 {
+        test-drive = {
+          device = "/dev/loop0";
+          crypttabExtraOpts = ["tries=0"];
+        };
+      };
+    };
+  };
+}
