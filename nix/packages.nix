@@ -5,7 +5,6 @@
 }:
 lib.makeScope pkgs.newScope (self: {
   inherit craneLib;
-  buildWorkspaceCrate = self.callPackage nix/buildWorkspaceCrate.nix {};
 
   cargoArtifacts = craneLib.buildDepsOnly {
     src = ./..;

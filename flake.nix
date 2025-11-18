@@ -1,5 +1,5 @@
 {
-  description = "Just an example project";
+  description = "Unlock LUKS drives using SDDM from NixOS stage1";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

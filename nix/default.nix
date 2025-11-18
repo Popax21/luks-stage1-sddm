@@ -3,7 +3,7 @@
   craneLib ?
     import (
       let
-        craneInput = (builtins.fromJSON (builtins.readFile nix/flake.lock)).nodes.crane.locked;
+        craneInput = (builtins.fromJSON (builtins.readFile ../flake.lock)).nodes.crane.locked;
       in
         fetchGit {
           url = "https://github.com/${craneInput.owner}/${craneInput.repo}";
@@ -11,4 +11,4 @@
         }
     ) {inherit pkgs;},
 }:
-pkgs.callPackage nix/packages.nix {inherit craneLib;}
+pkgs.callPackages ./packages.nix {inherit craneLib;}
