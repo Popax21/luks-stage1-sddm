@@ -43,9 +43,13 @@ fn main() -> ExitCode {
     let pw_reqs = PasswordRequest::listen().expect("failed to listen for password requests");
 
     smol::block_on(async {
-        let power_client = PowerActionClient::connect()
-            .await
-            .expect("failed to connect power action client");
+        let power_client = match PowerActionClient::connect().await {
+            Ok(c) => Some(c),
+            Err(err) => {
+                eprintln!("failed to connect power action client: {err:#}");
+                None
+            }
+        };
 
         let controller = Arc::new(Controller::new(power_client));
 
@@ -128,7 +132,7 @@ fn main() -> ExitCode {
 }
 
 struct Controller {
-    power_client: PowerActionClient,
+    power_client: Option<PowerActionClient>,
     request_tx: smol::channel::Sender<PasswordRequest>,
     login_lock: Mutex<LoginState>,
 }
@@ -139,7 +143,7 @@ struct LoginState {
 }
 
 impl Controller {
-    fn new(power_client: PowerActionClient) -> Controller {
+    fn new(power_client: Option<PowerActionClient>) -> Controller {
         let (request_tx, request_rx) = smol::channel::unbounded();
         Controller {
             power_client,
@@ -198,11 +202,18 @@ impl GreeterController for Controller {
     }
 
     fn can_perform_power_action(&self, act: PowerAction) -> bool {
-        self.power_client.can_perform_action(act)
+        self.power_client
+            .as_ref()
+            .is_some_and(|c| c.can_perform_action(act))
     }
 
     async fn perform_power_action(&self, act: PowerAction) {
         println!("performing power action {act:?}");
-        self.power_client.perform_action(act).await
+
+        self.power_client
+            .as_ref()
+            .expect("attempted to perform power action without power action client")
+            .perform_action(act)
+            .await
     }
 }

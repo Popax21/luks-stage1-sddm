@@ -36,15 +36,30 @@ pub struct PowerActionClient {
 
 impl PowerActionClient {
     pub async fn connect() -> Result<PowerActionClient> {
-        let conn = zbus::Connection::system()
+        //We usually don't run with a D-Bus broker in the initrd, so connect to the manager directly
+        //FIXME: there's no handshake; use AuthenticatedSocket
+        let conn = match zbus::connection::Builder::address("unix:path=/run/systemd/private")
+            .unwrap()
+            .build()
             .await
-            .context("failed to open system D-Bus connection")?;
+        {
+            Ok(c) => c,
+            Err(err) => {
+                eprintln!("failed to connect to private systemd D-Bus socket: {err:#}");
+                eprintln!("falling back to regular system D-Bus broker (if available)...");
+
+                zbus::Connection::system()
+                    .await
+                    .context("failed to open system D-Bus connection")?
+            }
+        };
 
         let mut client = PowerActionClient {
             manager_proxy: Systemd1ManagerProxy::new(&conn).await?,
             capable_acts: Default::default(),
         };
 
+        //Check which power actions are available
         for act in PowerAction::ALL_ACTIONS {
             match client.manager_proxy.load_unit(act.systemd_target()).await {
                 Ok(_) => client.capable_acts[act as usize] = true,
