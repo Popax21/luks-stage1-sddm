@@ -33,7 +33,6 @@
     boot.initrd = {
       systemd = {
         enable = true;
-        emergencyAccess = true;
         storePaths = [pkgs.coreutils-full pkgs.util-linux pkgs.cryptsetup];
 
         services.test-drive-setup = {
@@ -65,7 +64,11 @@
       };
     };
 
-    #Drop a shell in the stage 1 initrd 
+    #Enable luks-stage1-sddm
+    boot.initrd.luks.sddmUnlock.enable = true;
+
+    #Drop a shell in the stage 1 initrd
+    boot.initrd.systemd.emergencyAccess = true;
     boot.kernelParams = ["rd.systemd.unit=rescue.target"];
   };
 }

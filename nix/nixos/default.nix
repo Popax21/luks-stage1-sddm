@@ -1,9 +1,9 @@
 #Non-flake NixOS module entrypoint
 {
-  imports = [./modules];
+  imports = [./module.nix];
   config.nixpkgs.overlays = [
     (final: prev: {
-      inherit (import ../../default.nix {pkgs = final;}) luks-stage1-sddm;
+      inherit (import ./.. {pkgs = final;}) luks-stage1-sddm;
     })
   ];
 }

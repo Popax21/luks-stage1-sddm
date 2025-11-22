@@ -17,12 +17,12 @@ use zeroize::Zeroizing;
 
 fn main() -> ExitCode {
     //Parse the SDDM config file we're given
-    let Some(sddm_config) = std::env::args().nth(2) else {
+    let Some(sddm_config) = std::env::args().nth(1) else {
         eprintln!(
             "Usage: {:?} <SDDM config file>",
             std::env::current_exe().unwrap_or_default()
         );
-        std::process::exit(1);
+        return ExitCode::FAILURE;
     };
     let sddm_config = SddmConfig::load_from_file(Path::new(&sddm_config))
         .expect("failed to load SDDM config file");

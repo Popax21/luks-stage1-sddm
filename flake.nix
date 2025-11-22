@@ -51,11 +51,11 @@
     }))
     // rec {
       overlays.default = final: prev: {
-        inherit (final.callPackage nix/packages.nix {craneLib = crane.mkLib final;}) luks-stage1-sddm;
+        inherit (final.callPackages nix/packages.nix {craneLib = crane.mkLib final;}) luks-stage1-sddm;
       };
 
       nixosModules.default = {
-        imports = [nix/nixos/modules];
+        imports = [nix/nixos/module.nix];
         config.nixpkgs.overlays = [overlays.default];
       };
     };

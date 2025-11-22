@@ -1,3 +1,0 @@
-{...}: {
-  #NixOS module code here
-}

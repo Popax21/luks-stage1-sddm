@@ -11,7 +11,7 @@ impl SddmConfig {
         let ini = ini::Ini::load_from_file(path)?;
 
         let theme = if let Some(sec) = ini.section(Some("Theme")) {
-            if let Some(theme) = sec.get("Current") {
+            if let Some(theme) = sec.get("Current").filter(|t| !t.is_empty()) {
                 let dir = sec.get("ThemeDir").context("no ThemeDir property")?;
                 Some(Path::new(dir).join(theme))
             } else {

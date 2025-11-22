@@ -4,8 +4,6 @@
   craneLib,
 }:
 lib.makeScope pkgs.newScope (self: {
-  inherit craneLib;
-
   cargoArtifacts = craneLib.buildDepsOnly {
     src = ./..;
     strictDeps = true;
