@@ -7,28 +7,18 @@ use smol::{
 };
 use zeroize::Zeroizing;
 
+use crate::power_actions::PowerAction;
+
 pub trait GreeterController: Send + Sync + 'static {
     fn login(
         &self,
         user: &str,
         password: Zeroizing<Box<str>>,
         msg_sender: impl FnMut(&str) + Send + Sync,
-    ) -> impl Future<Output = bool> + Send + Sync;
+    ) -> impl Future<Output = bool> + Send;
 
-    fn can_shutdown(&self) -> bool;
-    fn shutdown(&self);
-
-    fn can_reboot(&self) -> bool;
-    fn reboot(&self);
-
-    fn can_suspend(&self) -> bool;
-    fn suspend(&self);
-
-    fn can_hibernate(&self) -> bool;
-    fn hibernate(&self);
-
-    fn can_hybrid_sleep(&self) -> bool;
-    fn hybrid_sleep(&self);
+    fn can_perform_power_action(&self, act: PowerAction) -> bool;
+    fn perform_power_action(&self, act: PowerAction) -> impl Future<Output = ()> + Send;
 }
 
 pub async fn greeter_control_server(socket_path: PathBuf, controller: Arc<impl GreeterController>) {
@@ -74,38 +64,28 @@ async fn greeter_control_connection(
         };
 
         match msg {
-            _ if msg == GreeterMessages::Connect as u32 => {
+            _ if msg == GreeterMessage::Connect as u32 => {
                 //Initial handshake; send the controller's capabilities / hostname
                 let mut caps = 0;
-                if controller.can_shutdown() {
-                    caps |= Capability::PowerOff as u32;
-                }
-                if controller.can_reboot() {
-                    caps |= Capability::Reboot as u32;
-                }
-                if controller.can_suspend() {
-                    caps |= Capability::Suspend as u32;
-                }
-                if controller.can_hibernate() {
-                    caps |= Capability::Hibernate as u32;
-                }
-                if controller.can_hybrid_sleep() {
-                    caps |= Capability::HybridSleep as u32;
+                for act in PowerAction::ALL_ACTIONS {
+                    if controller.can_perform_power_action(act) {
+                        caps |= Capability::from(act) as u32;
+                    }
                 }
 
-                conn.write_all(&u32::to_be_bytes(DaemonMessages::Capabilities as u32))
+                conn.write_all(&u32::to_be_bytes(DaemonMessage::Capabilities as u32))
                     .await?;
                 conn.write_all(&u32::to_be_bytes(caps)).await?;
 
                 if let Some(hostname) = gethostname::gethostname().to_str() {
-                    conn.write_all(&u32::to_be_bytes(DaemonMessages::HostName as u32))
+                    conn.write_all(&u32::to_be_bytes(DaemonMessage::HostName as u32))
                         .await?;
                     send_string(&mut conn, hostname).await?;
                 }
             }
 
             //Login requests
-            _ if msg == GreeterMessages::Login as u32 => {
+            _ if msg == GreeterMessage::Login as u32 => {
                 //Read the username / password
                 let user = recv_string(&mut conn).await?;
                 let password = Zeroizing::new(recv_string(&mut conn).await?);
@@ -127,29 +107,25 @@ async fn greeter_control_connection(
                 );
 
                 if login_ok {
-                    conn.write_all(&u32::to_be_bytes(DaemonMessages::LoginSucceeded as u32))
+                    conn.write_all(&u32::to_be_bytes(DaemonMessage::LoginSucceeded as u32))
                         .await?;
                 } else {
-                    conn.write_all(&u32::to_be_bytes(DaemonMessages::LoginFailed as u32))
+                    conn.write_all(&u32::to_be_bytes(DaemonMessage::LoginFailed as u32))
                         .await?;
                 }
             }
 
             //Power action messages
-            _ if msg == GreeterMessages::PowerOff as u32 => {
-                controller.shutdown();
-            }
-            _ if msg == GreeterMessages::Reboot as u32 => {
-                controller.reboot();
-            }
-            _ if msg == GreeterMessages::Suspend as u32 => {
-                controller.suspend();
-            }
-            _ if msg == GreeterMessages::Hibernate as u32 => {
-                controller.hibernate();
-            }
-            _ if msg == GreeterMessages::HybridSleep as u32 => {
-                controller.hybrid_sleep();
+            _ if PowerAction::ALL_ACTIONS
+                .into_iter()
+                .any(|a| msg == GreeterMessage::from(a) as u32) =>
+            {
+                let act = PowerAction::ALL_ACTIONS
+                    .into_iter()
+                    .find(|&a| msg == GreeterMessage::from(a) as u32)
+                    .unwrap();
+
+                controller.perform_power_action(act).await;
             }
 
             _ => {
@@ -180,7 +156,7 @@ async fn handle_login_request(
                     // - send the message to the greeter
                     let mut stream = stream.lock().await;
                     stream
-                        .write_all(&u32::to_be_bytes(DaemonMessages::InformationMessage as u32))
+                        .write_all(&u32::to_be_bytes(DaemonMessage::InformationMessage as u32))
                         .await?;
                     send_string(stream.deref_mut(), &msg).await?;
 
@@ -284,7 +260,8 @@ async fn send_string(stream: &mut (impl AsyncWrite + Unpin), val: &str) -> std::
 }
 
 #[repr(u32)]
-enum GreeterMessages {
+#[derive(Debug, Clone, Copy)]
+enum GreeterMessage {
     Connect = 0,
     Login,
     PowerOff,
@@ -294,8 +271,21 @@ enum GreeterMessages {
     HybridSleep,
 }
 
+impl From<PowerAction> for GreeterMessage {
+    fn from(value: PowerAction) -> Self {
+        match value {
+            PowerAction::PowerOff => Self::PowerOff,
+            PowerAction::Reboot => Self::Reboot,
+            PowerAction::Suspend => Self::Suspend,
+            PowerAction::Hibernate => Self::Hibernate,
+            PowerAction::HybridSleep => Self::HybridSleep,
+        }
+    }
+}
+
 #[repr(u32)]
-enum DaemonMessages {
+#[derive(Debug, Clone, Copy)]
+enum DaemonMessage {
     HostName,
     Capabilities,
     LoginSucceeded,
@@ -310,4 +300,16 @@ enum Capability {
     Suspend = 0b00100,
     Hibernate = 0b01000,
     HybridSleep = 0b10000,
+}
+
+impl From<PowerAction> for Capability {
+    fn from(value: PowerAction) -> Self {
+        match value {
+            PowerAction::PowerOff => Self::PowerOff,
+            PowerAction::Reboot => Self::Reboot,
+            PowerAction::Suspend => Self::Suspend,
+            PowerAction::Hibernate => Self::Hibernate,
+            PowerAction::HybridSleep => Self::HybridSleep,
+        }
+    }
 }

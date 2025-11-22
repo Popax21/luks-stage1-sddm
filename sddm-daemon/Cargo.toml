@@ -10,4 +10,5 @@ gethostname = "1.0.2"
 inotify = { version = "0.11.0", default-features = false }
 rust-ini = "0.21.1"
 smol = "2.0.2"
+zbus = { version = "5.12.0", default-features = false, features = ["async-io"] }
 zeroize = { version = "1.8.1", features = ["std"] }

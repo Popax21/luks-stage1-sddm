@@ -64,5 +64,8 @@
         };
       };
     };
+
+    #Drop a shell in the stage 1 initrd 
+    boot.kernelParams = ["rd.systemd.unit=rescue.target"];
   };
 }

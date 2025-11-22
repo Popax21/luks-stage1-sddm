@@ -2,7 +2,10 @@ use std::{collections::HashSet, path::Path, process::ExitCode, sync::Arc};
 
 mod control_server;
 mod password_agent;
+mod power_actions;
 mod sddm_config;
+
+use crate::power_actions::{PowerAction, PowerActionClient};
 
 use self::{
     control_server::{GreeterController, greeter_control_server},
@@ -40,7 +43,11 @@ fn main() -> ExitCode {
     let pw_reqs = PasswordRequest::listen().expect("failed to listen for password requests");
 
     smol::block_on(async {
-        let controller = Arc::new(Controller::new());
+        let power_client = PowerActionClient::connect()
+            .await
+            .expect("failed to connect power action client");
+
+        let controller = Arc::new(Controller::new(power_client));
 
         //Start listening for systemd password requests
         let pw_req_handler = smol::spawn({
@@ -121,6 +128,7 @@ fn main() -> ExitCode {
 }
 
 struct Controller {
+    power_client: PowerActionClient,
     request_tx: smol::channel::Sender<PasswordRequest>,
     login_lock: Mutex<LoginState>,
 }
@@ -131,9 +139,10 @@ struct LoginState {
 }
 
 impl Controller {
-    fn new() -> Controller {
+    fn new(power_client: PowerActionClient) -> Controller {
         let (request_tx, request_rx) = smol::channel::unbounded();
         Controller {
+            power_client,
             request_tx,
             login_lock: Mutex::new(LoginState {
                 request_rx,
@@ -188,28 +197,12 @@ impl GreeterController for Controller {
         true
     }
 
-    fn can_shutdown(&self) -> bool {
-        true
+    fn can_perform_power_action(&self, act: PowerAction) -> bool {
+        self.power_client.can_perform_action(act)
     }
-    fn shutdown(&self) {}
 
-    fn can_reboot(&self) -> bool {
-        true
+    async fn perform_power_action(&self, act: PowerAction) {
+        println!("performing power action {act:?}");
+        self.power_client.perform_action(act).await
     }
-    fn reboot(&self) {}
-
-    fn can_suspend(&self) -> bool {
-        true
-    }
-    fn suspend(&self) {}
-
-    fn can_hibernate(&self) -> bool {
-        false
-    }
-    fn hibernate(&self) {}
-
-    fn can_hybrid_sleep(&self) -> bool {
-        false
-    }
-    fn hybrid_sleep(&self) {}
 }
