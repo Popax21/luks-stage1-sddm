@@ -37,10 +37,9 @@ in {
       enable = true;
       storePaths = [cfg.package sddmConfig];
       services.luks-sddm = {
+        description = "SDDM Graphical LUKS Unlock";
         before = ["cryptsetup-pre.target"];
         requiredBy = ["sysinit.target"];
-
-        serviceConfig.Description = "SDDM Graphical LUKS Unlock";
         serviceConfig.ExecStart = "${lib.getExe cfg.package} ${lib.escapeShellArg (toString sddmConfig)}";
       };
     };

@@ -19,6 +19,8 @@
       diskImage = null;
       graphics = true;
       restrictNetwork = true;
+      qemu.options = ["-serial stdio"];
+      qemu.consoles = ["ttyS0,115200n8"];
     };
     networking.dhcpcd.enable = false;
 
@@ -66,6 +68,7 @@
 
     #Enable luks-stage1-sddm
     boot.initrd.luks.sddmUnlock.enable = true;
+    boot.initrd.systemd.services.luks-sddm.environment.RUST_BACKTRACE = "1";
 
     #Drop a shell in the stage 1 initrd
     boot.initrd.systemd.emergencyAccess = true;
