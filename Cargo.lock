@@ -473,6 +473,7 @@ dependencies = [
  "gethostname",
  "inotify",
  "rust-ini",
+ "serde",
  "smol",
  "zbus",
  "zeroize",
