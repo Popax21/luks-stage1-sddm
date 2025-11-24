@@ -30,6 +30,7 @@
       password = "testing";
       extraGroups = ["wheel"];
     };
+    users.users.root.password = "testing";
 
     #Setup a testing LUKS-encrypted drive
     boot.initrd = {
@@ -67,11 +68,17 @@
     };
 
     #Enable luks-stage1-sddm
-    boot.initrd.luks.sddmUnlock.enable = true;
+    boot.initrd.luks.sddmUnlock = {
+      enable = true;
+      users = ["tester"];
+    };
     boot.initrd.systemd.services.luks-sddm.environment.RUST_BACKTRACE = "1";
     boot.initrd.availableKernelModules = ["bochs"]; # - required to get DRI/DRM working in the initrd
 
     #Drop a shell in the stage 1 initrd
+    services.journald.console = "/dev/ttyS0";
+    boot.initrd.systemd.contents."/etc/systemd/journald.conf".source = config.environment.etc."systemd/journald.conf".source;
+
     boot.kernelParams = ["rd.systemd.unit=rescue.target"];
     boot.initrd.systemd = {
       emergencyAccess = true;

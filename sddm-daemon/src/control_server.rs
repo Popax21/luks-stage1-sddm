@@ -1,7 +1,8 @@
 use std::{io::ErrorKind, mem::MaybeUninit, ops::DerefMut, path::PathBuf, str, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{Result, bail, ensure};
 use smol::{
+    future::FutureExt,
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     net::unix::{UnixListener, UnixStream},
 };
@@ -49,102 +50,108 @@ async fn greeter_control_connection(
     mut conn: UnixStream,
     controller: Arc<impl GreeterController>,
 ) -> Result<()> {
-    //Receive messages from the connection
-    loop {
-        let msg = {
-            let mut buf = [0u8; 4];
-            if let Err(err) = conn.read_exact(&mut buf).await {
-                return if err.kind() == ErrorKind::UnexpectedEof {
-                    Ok(())
-                } else {
-                    Err(err.into())
-                };
-            }
-            u32::from_be_bytes(buf)
-        };
+    //Perform the initial handshake
+    match recv_msg(&mut conn).await? {
+        Some(msg) => {
+            ensure!(
+                msg == GreeterMessage::Connect as u32,
+                "unexpected first message: {msg}"
+            );
 
-        match msg {
-            _ if msg == GreeterMessage::Connect as u32 => {
-                //Initial handshake; send the controller's capabilities / hostname
-                let mut caps = 0;
-                for act in PowerAction::ALL_ACTIONS {
-                    if controller.can_perform_power_action(act) {
-                        caps |= Capability::from(act) as u32;
-                    }
+            let mut caps = 0;
+            for act in PowerAction::ALL_ACTIONS {
+                if controller.can_perform_power_action(act) {
+                    caps |= Capability::from(act) as u32;
                 }
+            }
 
-                conn.write_all(&u32::to_be_bytes(DaemonMessage::Capabilities as u32))
+            //Send the controller's capabilities / hostname
+            conn.write_all(&u32::to_be_bytes(DaemonMessage::Capabilities as u32))
+                .await?;
+            conn.write_all(&u32::to_be_bytes(caps)).await?;
+
+            if let Some(hostname) = gethostname::gethostname().to_str() {
+                conn.write_all(&u32::to_be_bytes(DaemonMessage::HostName as u32))
                     .await?;
-                conn.write_all(&u32::to_be_bytes(caps)).await?;
-
-                if let Some(hostname) = gethostname::gethostname().to_str() {
-                    conn.write_all(&u32::to_be_bytes(DaemonMessage::HostName as u32))
-                        .await?;
-                    send_string(&mut conn, hostname).await?;
-                }
-            }
-
-            //Login requests
-            _ if msg == GreeterMessage::Login as u32 => {
-                //Read the username / password
-                let user = recv_string(&mut conn).await?;
-                let password = Zeroizing::new(recv_string(&mut conn).await?);
-
-                //Read the session the user selected, tho we ignore this info
-                let mut _ses_type = [0u8; 4];
-                conn.read_exact(&mut _ses_type).await?;
-                let _ses_filename = recv_string(&mut conn).await?;
-
-                //Forward the request to the controller
-                println!("handling login request from greeter for user {user:?}");
-
-                let login_ok =
-                    handle_login_request(&mut conn, &user, password, &*controller).await?;
-
-                println!(
-                    "finished handling login request for user {user:?}, result: {}",
-                    if login_ok { "OK" } else { "failure" }
-                );
-
-                if login_ok {
-                    conn.write_all(&u32::to_be_bytes(DaemonMessage::LoginSucceeded as u32))
-                        .await?;
-                } else {
-                    conn.write_all(&u32::to_be_bytes(DaemonMessage::LoginFailed as u32))
-                        .await?;
-                }
-            }
-
-            //Power action messages
-            _ if PowerAction::ALL_ACTIONS
-                .into_iter()
-                .any(|a| msg == GreeterMessage::from(a) as u32) =>
-            {
-                let act = PowerAction::ALL_ACTIONS
-                    .into_iter()
-                    .find(|&a| msg == GreeterMessage::from(a) as u32)
-                    .unwrap();
-
-                controller.perform_power_action(act).await;
-            }
-
-            _ => {
-                eprintln!("unknown greeter control message {msg}")
+                send_string(&mut conn, hostname).await?;
             }
         }
+        None => return Ok(()),
     }
+
+    //Handle messages received from the connection
+    let (err_tx, err_rx) = smol::channel::bounded(1);
+    let exec = smol::Executor::new();
+
+    let main_loop = async {
+        let mut login_task = None;
+        loop {
+            match recv_msg(&mut conn).await? {
+                //Login requests
+                Some(msg) if msg == GreeterMessage::Login as u32 => {
+                    ensure!(
+                        login_task.as_ref().is_none_or(smol::Task::is_finished),
+                        "got multiple concurrent login requests"
+                    );
+
+                    //Read the username / password
+                    let user = recv_string(&mut conn).await?;
+                    let password = Zeroizing::new(recv_string(&mut conn).await?);
+
+                    //Read the session the user selected, tho we ignore this info
+                    let mut _ses_type = [0u8; 4];
+                    conn.read_exact(&mut _ses_type).await?;
+                    let _ses_filename = recv_string(&mut conn).await?;
+
+                    //Forward the request to the controller
+                    println!("handling login request from greeter for user {user:?}");
+
+                    let conn = conn.clone();
+                    let err_tx = err_tx.clone();
+                    let controller = controller.clone();
+                    login_task = Some(exec.spawn(async move {
+                        if let Err(err) =
+                            handle_login_request(conn, &user, password, &*controller).await
+                        {
+                            _ = err_tx.try_send(err);
+                        }
+                    }));
+                }
+
+                //Power action messages
+                Some(msg)
+                    if PowerAction::ALL_ACTIONS
+                        .into_iter()
+                        .any(|a| msg == GreeterMessage::from(a) as u32) =>
+                {
+                    let act = PowerAction::ALL_ACTIONS
+                        .into_iter()
+                        .find(|&a| msg == GreeterMessage::from(a) as u32)
+                        .unwrap();
+
+                    controller.perform_power_action(act).await;
+                }
+
+                Some(msg) => bail!("unknown greeter control message {msg}"),
+                None => return Ok(()),
+            }
+        }
+    };
+
+    exec.run(main_loop.or(async { Err(err_rx.recv().await.unwrap()) }))
+        .await
 }
 
 async fn handle_login_request(
-    stream: &mut (impl AsyncWrite + Send + Sync + Unpin),
+    stream: impl AsyncWrite + Send + Sync + Unpin,
     user: &str,
     password: Zeroizing<Box<str>>,
     controller: &impl GreeterController,
-) -> Result<bool> {
+) -> Result<()> {
     let stream = smol::lock::Mutex::new(stream);
 
     let msg_exec = smol::Executor::new();
-    msg_exec
+    let login_ok = msg_exec
         .run(async {
             //Setup information message handling
             let mut msg_tasks = Vec::new();
@@ -167,14 +174,42 @@ async fn handle_login_request(
             //Invoke the controller
             let login_ok = controller.login(user, password, msg_sender).await;
 
+            println!(
+                "finished handling login request for user {user:?}, result: {}",
+                if login_ok { "OK" } else { "failure" }
+            );
+
             //Finish sending information messages
             for t in msg_tasks {
                 t.await?;
             }
 
-            Ok(login_ok)
+            Ok::<_, anyhow::Error>(login_ok)
         })
-        .await
+        .await?;
+
+    drop(msg_exec);
+
+    //Reply with the correct answer message
+    stream
+        .into_inner()
+        .write_all(&u32::to_be_bytes(if login_ok {
+            DaemonMessage::LoginSucceeded
+        } else {
+            DaemonMessage::LoginFailed
+        } as u32))
+        .await?;
+
+    Ok(())
+}
+
+async fn recv_msg(stream: &mut (impl AsyncRead + Unpin)) -> std::io::Result<Option<u32>> {
+    let mut buf = [0u8; 4];
+    match stream.read_exact(&mut buf).await {
+        Ok(_) => Ok(Some(u32::from_be_bytes(buf))),
+        Err(err) if err.kind() == ErrorKind::UnexpectedEof => Ok(None),
+        Err(err) => Err(err),
+    }
 }
 
 async fn recv_string(stream: &mut (impl AsyncRead + Unpin)) -> std::io::Result<Box<str>> {

@@ -53,11 +53,16 @@ in {
     enable = lib.mkEnableOption "LUKS unlock using SDDM in initrd";
     package = lib.mkPackageOption pkgs "luks-stage1-sddm" {};
 
+    users = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      description = "Users which should be available to log in as.";
+    };
+
     theme = lib.mkOption {
       type = lib.types.str;
+      description = "Greeter theme to use.";
       default = config.services.displayManager.sddm.theme;
       defaultText = lib.literalExpression "config.services.displayManager.sddm.theme";
-      description = "Greeter theme to use.";
     };
 
     settings = lib.mkOption {
@@ -67,33 +72,50 @@ in {
     };
   };
   config = lib.mkIf cfg.enable {
-    boot.initrd.systemd = {
-      enable = true;
+    boot.initrd = {
+      systemd = {
+        enable = true;
 
-      storePaths = [
-        {
-          source = squashedClosure;
-          target = squashedClosurePath;
-        }
-      ];
+        #Copy the squashed closure into the initrd
+        storePaths = [
+          {
+            source = squashedClosure;
+            target = squashedClosurePath;
+          }
+        ];
 
-      services.luks-sddm = {
-        description = "SDDM Graphical LUKS Unlock";
-        after = ["systemd-sysctl.service" "systemd-udevd.service" "localfs.target"];
-        before = ["cryptsetup-pre.target"];
-        wantedBy = ["cryptsetup.target"];
-        unitConfig.DefaultDependencies = false;
+        #Setup the SDDM service
+        services.luks-sddm = {
+          description = "SDDM Graphical LUKS Unlock";
+          after = ["systemd-sysctl.service" "systemd-udevd.service" "localfs.target"];
+          before = ["cryptsetup-pre.target"];
+          wantedBy = ["cryptsetup.target"];
+          unitConfig.DefaultDependencies = false;
 
-        preStart = ''
-          mkdir -p /tmp/luks-sddm-closure
-          mount -t squashfs -o loop ${lib.escapeShellArg squashedClosurePath} /tmp/luks-sddm-closure
-          mount -t overlay overlay -o lowerdir=${builtins.storeDir}:/tmp/luks-sddm-closure${builtins.storeDir} ${builtins.storeDir}
-        '';
-        serviceConfig.ExecStart = "${lib.getExe cfg.package} ${lib.escapeShellArg (toString sddmConfig)}";
+          preStart = ''
+            mkdir -p /tmp/luks-sddm-closure
+            mount -t squashfs -o loop ${lib.escapeShellArg squashedClosurePath} /tmp/luks-sddm-closure
+            mount -t overlay overlay -o lowerdir=${builtins.storeDir}:/tmp/luks-sddm-closure${builtins.storeDir} ${builtins.storeDir}
+          '';
+          serviceConfig.ExecStart = "${lib.getExe cfg.package} ${lib.escapeShellArg (toString sddmConfig)}";
 
-        environment.QT_QPA_PLATFORM = "linuxfb";
+          environment.QT_QPA_PLATFORM = "linuxfb";
+        };
+
+        #Setup users we should be able to log in as
+        users = lib.listToAttrs (lib.imap0
+          (idx: name: {
+            inherit name;
+            value.uid = 10000 + idx; # - exact value doesn't matter
+            value.group = "nogroup";
+          })
+          cfg.users);
       };
+
+      #We need to enable support for some things we need to have early in initrd
+      supportedFilesystems.squashfs = true;
+
+      availableKernelModules = ["evdev"]; # - required for input / etc.
     };
-    boot.initrd.supportedFilesystems.squashfs = true;
   };
 }

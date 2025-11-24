@@ -139,6 +139,7 @@ struct Controller {
 
 struct LoginState {
     request_rx: smol::channel::Receiver<PasswordRequest>,
+    pending_request: Option<PasswordRequest>,
     processed_ids: HashSet<String>,
 }
 
@@ -150,6 +151,7 @@ impl Controller {
             request_tx,
             login_lock: Mutex::new(LoginState {
                 request_rx,
+                pending_request: None,
                 processed_ids: HashSet::new(),
             }),
         }
@@ -177,8 +179,11 @@ impl GreeterController for Controller {
     ) -> bool {
         let mut state = self.login_lock.lock().await;
 
-        //Receive a request to process
-        while let Ok(req) = state.request_rx.recv().await {
+        //Receive a request to process, or if we already have a request from the last failed login attempt, process that
+        while let Ok(req) = match state.pending_request.take() {
+            Some(r) => Ok(r),
+            None => state.request_rx.recv().await,
+        } {
             //Check if we processed this request already; if yes, then the password wasn't correct, so bail
             let id = req.id.as_ref().unwrap();
             if !state.processed_ids.insert(id.clone()) {
@@ -186,6 +191,7 @@ impl GreeterController for Controller {
                 msg_sender(&format!("failed to unlock {id}"));
 
                 state.processed_ids.clear();
+                state.pending_request = Some(req);
                 return false;
             }
 

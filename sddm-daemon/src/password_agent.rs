@@ -77,7 +77,7 @@ impl PasswordRequest {
             match Self::load_from_ini(&path) {
                 Ok(req) => Some(req),
                 Err(err) => {
-                    eprintln!("failed to load password request from ini file {path:?}: {err:?}");
+                    eprintln!("failed to load password request from ini file {path:?}: {err:#}");
                     None
                 }
             }
