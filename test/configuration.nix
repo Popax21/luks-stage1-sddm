@@ -49,7 +49,7 @@
             truncate -s 100M /tmp/test-drive
             echo -ne ${lib.escapeShellArg config.users.users.tester.password} \
               | cryptsetup luksFormat --batch-mode --force-password --type luks2 /tmp/test-drive -
-            losetup /dev/loop0 /tmp/test-drive
+            losetup /dev/loop7 /tmp/test-drive
           '';
           path = [pkgs.coreutils-full pkgs.util-linux pkgs.cryptsetup];
         };
@@ -60,7 +60,7 @@
       # - has to be stronger than mkVMOverride (priority 10)
       luks.devices = lib.mkOverride 5 {
         test-drive = {
-          device = "/dev/loop0";
+          device = "/dev/loop7";
           crypttabExtraOpts = ["tries=0"];
         };
       };
@@ -71,7 +71,13 @@
     boot.initrd.systemd.services.luks-sddm.environment.RUST_BACKTRACE = "1";
 
     #Drop a shell in the stage 1 initrd
-    boot.initrd.systemd.emergencyAccess = true;
     boot.kernelParams = ["rd.systemd.unit=rescue.target"];
+    boot.initrd.systemd = {
+      emergencyAccess = true;
+      extraBin = {
+        ldd = lib.getExe' pkgs.glibc "ldd";
+        grep = lib.getExe pkgs.gnugrep;
+      };
+    };
   };
 }

@@ -1,5 +1,6 @@
 {
   config,
+  options,
   lib,
   pkgs,
   ...
@@ -15,17 +16,38 @@
 
   sddmConfig = iniFmt.generate "initrd-sddm.conf" (lib.recursiveUpdate defaultConfig cfg.settings);
 
-  squashedClosure = pkgs.stdenvNoCC.mkDerivation {
-    name = "initrd-sddm-closure";
+  squashedClosurePath = "/luks-sddm-closure.sqsh";
+  squashedClosure =
+    pkgs.runCommand "initrd-sddm-closure" {
+      __structuredAttrs = true;
+      exportReferencesGraph.closure = [cfg.package sddmConfig];
+      unsafeDiscardReferences.out = true;
 
-    __structuredAttrs = true;
-    exportReferencesGraph.closure = [cfg.package sddmConfig];
-    unsafeDiscardReferences.out = true;
+      basePaths = let
+        defs = lib.flatten (lib.options.getValues options.boot.initrd.systemd.storePaths.definitionsWithLocations);
 
-    nativeBuildInputs = with pkgs; [jq squashfsTools];
+        filterDefs = d: builtins.typeOf d != "set" || (d.target or null) != squashedClosurePath;
 
-    buildCommand = ''jq -r '.closure[].path' < "$NIX_ATTRS_JSON_FILE" | xargs mksquashfs {} "$out" -comp xz'';
-  };
+        defToStorePath = d:
+          toString (
+            if builtins.typeOf d == "set"
+            then d.outPath or d.source
+            else d
+          );
+      in
+        map defToStorePath (builtins.filter filterDefs defs);
+
+      nativeBuildInputs = with pkgs; [jq squashfsTools];
+    } ''
+      mapfile -t closure < <(cat "$NIX_ATTRS_JSON_FILE" | jq -r '.closure[].path' | xargs -i find {} -type f -or -type l | sort -u)
+      mapfile -t basePaths < <(cat "$NIX_ATTRS_JSON_FILE" | jq -r '.basePaths[]' | xargs -i find {} -type f -or -type l | sort -u)
+
+      mapfile -t commonPaths < <((IFS=$'\n'; echo "''${closure[*]}"; echo "''${basePaths[*]}") | sort | uniq -d)
+      mapfile -t toCompress < <((IFS=$'\n'; echo "''${closure[*]}"; echo "''${commonPaths[*]}") | sort | uniq -u)
+
+      echo "Compressing ''${#toCompress[@]} files (''${#closure[@]} total, skipping ''${#commonPaths[@]} common files)"
+      (IFS=$'\n'; echo "''${toCompress[*]}") | mksquashfs - "$out" -quiet -no-strip -cpiostyle -comp xz
+    '';
 in {
   options.boot.initrd.luks.sddmUnlock = {
     enable = lib.mkEnableOption "LUKS unlock using SDDM in initrd";
@@ -47,20 +69,29 @@ in {
   config = lib.mkIf cfg.enable {
     boot.initrd.systemd = {
       enable = true;
-      storePaths = [squashedClosure pkgs.mount];
+
+      storePaths = [
+        {
+          source = squashedClosure;
+          target = squashedClosurePath;
+        }
+      ];
 
       services.luks-sddm = {
         description = "SDDM Graphical LUKS Unlock";
+        after = ["systemd-sysctl.service" "systemd-udevd.service" "localfs.target"];
         before = ["cryptsetup-pre.target"];
-        requiredBy = ["sysinit.target"];
-        requires = ["luks-sddm-overlay.mount"];
-        serviceConfig.ExecStart = "${lib.getExe cfg.package} ${lib.escapeShellArg (toString sddmConfig)}";
+        wantedBy = ["cryptsetup.target"];
+        unitConfig.DefaultDependencies = false;
+
         preStart = ''
-          mkdir -p /tmp/luks-sddm-squash
-          ${lib.getExe pkgs.mount} -t squashfs -o loop ${squashedClosure} /tmp/luks-sddm-squash
-          ${lib.getExe pkgs.mount} -t overlay overlay -o lowerdir=${builtins.storeDir}:/tmp-luks-sddm-squash ${builtins.storeDir}
+          mkdir -p /tmp/luks-sddm-closure
+          mount -t squashfs -o loop ${lib.escapeShellArg squashedClosurePath} /tmp/luks-sddm-closure
+          mount -t overlay overlay -o lowerdir=${builtins.storeDir}:/tmp/luks-sddm-closure${builtins.storeDir} ${builtins.storeDir}
         '';
+        serviceConfig.ExecStart = "${lib.getExe cfg.package} ${lib.escapeShellArg (toString sddmConfig)}";
       };
     };
+    boot.initrd.supportedFilesystems.squashfs = true;
   };
 }
