@@ -73,6 +73,11 @@ impl PasswordRequest {
                 return None;
             }
 
+            //Check if the file still exists
+            if !path.exists() {
+                return None;
+            }
+
             //Try to load the request from the INI file
             match Self::load_from_ini(&path) {
                 Ok(req) => Some(req),

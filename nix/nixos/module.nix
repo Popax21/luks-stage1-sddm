@@ -92,14 +92,28 @@ in {
           wantedBy = ["cryptsetup.target"];
           unitConfig.DefaultDependencies = false;
 
+          serviceConfig.ExecStart = "${lib.getExe cfg.package} ${lib.escapeShellArg (toString sddmConfig)}";
+
+          # - mount the squashed closure before startup
           preStart = ''
             mkdir -p /tmp/luks-sddm-closure
             mount -t squashfs -o loop ${lib.escapeShellArg squashedClosurePath} /tmp/luks-sddm-closure
             mount -t overlay overlay -o lowerdir=${builtins.storeDir}:/tmp/luks-sddm-closure${builtins.storeDir} ${builtins.storeDir}
           '';
-          serviceConfig.ExecStart = "${lib.getExe cfg.package} ${lib.escapeShellArg (toString sddmConfig)}";
 
-          environment.QT_QPA_PLATFORM = "linuxfb";
+          # - if we fail, refresh the system's fbcon
+          postStop = ''
+            if [ "$SERVICE_RESULT" != "success" ]; then
+              cat /sys/class/graphics/fbcon/rotate > /sys/class/graphics/fbcon/rotate
+            fi
+          '';
+
+          # - configure the embedded QT backend
+          environment = {
+            QT_QPA_PLATFORM = "linuxfb";
+            QT_QPA_FB_DRM = "1";
+            QT_QPA_EVDEV_KEYBOARD_PARAMETERS = "grab=1";
+          };
         };
 
         #Setup users we should be able to log in as

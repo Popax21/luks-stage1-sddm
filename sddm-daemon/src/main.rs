@@ -1,6 +1,7 @@
 use std::{collections::HashSet, path::Path, process::ExitCode, sync::Arc};
 
 mod control_server;
+mod failsafe;
 mod password_agent;
 mod power_actions;
 mod sddm_config;
@@ -38,6 +39,15 @@ fn main() -> ExitCode {
     let mut signals =
         async_signal::Signals::new([async_signal::Signal::Term, async_signal::Signal::Int])
             .expect("failed to register terminating signal handlers");
+
+    //Register a failsafe handler which listens for keyboard events from evdev
+    let failsafe_signal = match failsafe::start_failsafe() {
+        Ok(s) => s,
+        Err(err) => {
+            eprintln!("failed to initialize evdev failsafe: {err:#}");
+            return ExitCode::FAILURE;
+        }
+    };
 
     //Start listening for password requests from systemd
     let pw_reqs = PasswordRequest::listen().expect("failed to listen for password requests");
@@ -92,14 +102,21 @@ fn main() -> ExitCode {
         };
 
         //Wait until we receive a SIGTERM / SIGINT signal, or the greeter finishes
+        let mut failsafe_engaged = false;
         smol::future::or(
-            async {
-                signals
-                    .next()
-                    .await
-                    .unwrap()
-                    .expect("failed to wait for a terminating signal");
-            },
+            smol::future::or(
+                async {
+                    signals
+                        .next()
+                        .await
+                        .unwrap()
+                        .expect("failed to wait for a terminating signal");
+                },
+                async {
+                    failsafe_signal.await;
+                    failsafe_engaged = true;
+                },
+            ),
             async {
                 greeter
                     .status()
@@ -113,7 +130,11 @@ fn main() -> ExitCode {
         pw_req_handler.cancel().await;
         controller.shutdown_controller();
 
-        //Retrieve the greeter status
+        //Retrieve the greeter status, unless the failsafe was engaged, then kill it
+        if failsafe_engaged {
+            _ = greeter.kill();
+        }
+
         let greeter_status = greeter
             .status()
             .await
@@ -199,7 +220,7 @@ impl GreeterController for Controller {
             println!("responding to password request from {id}");
 
             if let Err(err) = req.reply(Some(password.clone())).await {
-                eprintln!("failed to reply to password request: {err:?}")
+                eprintln!("failed to reply to password request: {err:#}")
             }
         }
 

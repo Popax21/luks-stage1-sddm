@@ -89,11 +89,6 @@ async fn greeter_control_connection(
             match recv_msg(&mut conn).await? {
                 //Login requests
                 Some(msg) if msg == GreeterMessage::Login as u32 => {
-                    ensure!(
-                        login_task.as_ref().is_none_or(smol::Task::is_finished),
-                        "got multiple concurrent login requests"
-                    );
-
                     //Read the username / password
                     let user = recv_string(&mut conn).await?;
                     let password = Zeroizing::new(recv_string(&mut conn).await?);
@@ -104,6 +99,11 @@ async fn greeter_control_connection(
                     let _ses_filename = recv_string(&mut conn).await?;
 
                     //Forward the request to the controller
+                    if !login_task.as_ref().is_none_or(smol::Task::is_finished) {
+                        println!("ignoring concurrent login request for user {user:?}");
+                        continue;
+                    }
+
                     println!("handling login request from greeter for user {user:?}");
 
                     let conn = conn.clone();

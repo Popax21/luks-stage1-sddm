@@ -20,7 +20,6 @@
       graphics = true;
       restrictNetwork = true;
       qemu.options = ["-serial stdio"];
-      qemu.consoles = ["ttyS0,115200n8"];
     };
     networking.dhcpcd.enable = false;
 
