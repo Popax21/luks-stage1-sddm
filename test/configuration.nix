@@ -69,6 +69,7 @@
     #Enable luks-stage1-sddm
     boot.initrd.luks.sddmUnlock.enable = true;
     boot.initrd.systemd.services.luks-sddm.environment.RUST_BACKTRACE = "1";
+    boot.initrd.availableKernelModules = ["bochs"]; # - required to get DRI/DRM working in the initrd
 
     #Drop a shell in the stage 1 initrd
     boot.kernelParams = ["rd.systemd.unit=rescue.target"];

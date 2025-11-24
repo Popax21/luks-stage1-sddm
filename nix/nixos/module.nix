@@ -90,6 +90,8 @@ in {
           mount -t overlay overlay -o lowerdir=${builtins.storeDir}:/tmp/luks-sddm-closure${builtins.storeDir} ${builtins.storeDir}
         '';
         serviceConfig.ExecStart = "${lib.getExe cfg.package} ${lib.escapeShellArg (toString sddmConfig)}";
+
+        environment.QT_QPA_PLATFORM = "linuxfb";
       };
     };
     boot.initrd.supportedFilesystems.squashfs = true;
