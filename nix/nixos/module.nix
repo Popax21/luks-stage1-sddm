@@ -7,13 +7,13 @@
 }: let
   cfg = config.boot.initrd.luks.sddmUnlock;
 
-  iniFmt = pkgs.formats.ini {};
-
   defaultConfig = {
     General.DisplayServer = "wayland";
     Theme.Current = cfg.theme;
+    LUKSUnlock.Devices = map (name: config.boot.initrd.luks.devices.${name}.device) cfg.luksDevices;
   };
 
+  iniFmt = pkgs.formats.ini {listsAsDuplicateKeys = true;};
   sddmConfig = iniFmt.generate "initrd-sddm.conf" (lib.recursiveUpdate defaultConfig cfg.settings);
 
   squashedClosurePath = "/luks-sddm-closure.sqsh";
@@ -57,6 +57,10 @@ in {
       type = lib.types.listOf lib.types.str;
       description = "Users which should be available to log in as.";
     };
+    luksDevices = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      description = "The name of LUKS devices that will be unlocked using SDDM. There must be a corresponding entry in `boot.initrd.luks.devices` for each listed device.";
+    };
 
     theme = lib.mkOption {
       type = lib.types.str;
@@ -87,8 +91,8 @@ in {
         #Setup the SDDM service
         services.luks-sddm = {
           description = "SDDM Graphical LUKS Unlock";
-          after = ["systemd-sysctl.service" "systemd-udevd.service" "localfs.target"];
-          before = ["cryptsetup-pre.target" "systemd-ask-password-console.service"];
+          after = ["systemd-sysctl.service" "systemd-udevd.service" "systemd-ask-password-console.service" "localfs.target"];
+          before = ["cryptsetup-pre.target"];
           wantedBy = ["cryptsetup.target"];
           unitConfig.DefaultDependencies = false;
 
@@ -127,8 +131,10 @@ in {
 
       #We need to enable support for some things we need to have early in initrd
       supportedFilesystems.squashfs = true;
-
       availableKernelModules = ["evdev"]; # - required for input / etc.
+
+      #Configure infinite retries for all devices we should unlock
+      luks.devices = lib.genAttrs cfg.luksDevices (_: {crypttabExtraOpts = ["tries=0"];});
     };
   };
 }

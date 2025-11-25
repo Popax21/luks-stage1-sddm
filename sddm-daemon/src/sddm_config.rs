@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 
 pub struct SddmConfig {
     pub theme: Option<PathBuf>,
+    pub luks_devices: Vec<PathBuf>,
 }
 
 impl SddmConfig {
@@ -21,6 +22,16 @@ impl SddmConfig {
             None
         };
 
-        Ok(SddmConfig { theme })
+        let luks_devices = ini
+            .section(Some("LUKSUnlock"))
+            .context("no LUKSUnlock section")?
+            .get_all("Devices")
+            .map(PathBuf::from)
+            .collect();
+
+        Ok(SddmConfig {
+            theme,
+            luks_devices,
+        })
     }
 }

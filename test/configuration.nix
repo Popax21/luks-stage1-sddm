@@ -70,7 +70,9 @@
     boot.initrd.luks.sddmUnlock = {
       enable = true;
       users = ["tester"];
+      luksDevices = ["test-drive"];
     };
+
     boot.initrd.systemd.services.luks-sddm.environment.RUST_BACKTRACE = "1";
     boot.initrd.availableKernelModules = ["bochs"]; # - required to get DRI/DRM working in the initrd
 

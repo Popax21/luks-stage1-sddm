@@ -95,7 +95,7 @@ fn main() -> ExitCode {
             }
         };
 
-        let controller = Arc::new(Controller::new(power_client));
+        let controller = Arc::new(Controller::new(power_client, sddm_config));
 
         //Start listening for systemd password requests
         let pw_req_handler = smol::spawn({
@@ -125,7 +125,7 @@ fn main() -> ExitCode {
                 Command::new(option_env!("EXE_SDDM_GREETER").unwrap_or("sddm-greeter-qt6"));
             let cmd = cmd.arg("--socket").arg(&socket_path);
 
-            let cmd = if let Some(theme) = &sddm_config.theme {
+            let cmd = if let Some(theme) = &controller.sddm_config.theme {
                 // - if we have a theme configured, pass that to the greeter
                 cmd.arg("--theme").arg(theme)
             } else {
@@ -190,6 +190,7 @@ struct Controller {
     power_client: Option<PowerActionClient>,
     request_tx: smol::channel::Sender<PasswordRequest>,
     login_lock: Mutex<LoginState>,
+    sddm_config: SddmConfig,
 }
 
 struct LoginState {
@@ -199,7 +200,7 @@ struct LoginState {
 }
 
 impl Controller {
-    fn new(power_client: Option<PowerActionClient>) -> Controller {
+    fn new(power_client: Option<PowerActionClient>, sddm_config: SddmConfig) -> Controller {
         let (request_tx, request_rx) = smol::channel::unbounded();
         Controller {
             power_client,
@@ -209,11 +210,29 @@ impl Controller {
                 pending_request: None,
                 processed_ids: HashSet::new(),
             }),
+            sddm_config,
         }
     }
 
     fn process_request(&self, req: PasswordRequest) {
-        println!("queuing password request from {}", req.id.as_ref().unwrap());
+        //Check if we should process this request
+        let Some(path) = req
+            .id
+            .as_ref()
+            .and_then(|id| id.strip_prefix("cryptsetup:"))
+            .map(Path::new)
+        else {
+            println!("ignoring non-cryptsetup password request: {req:?}");
+            return;
+        };
+
+        if !self.sddm_config.luks_devices.iter().any(|dev| dev == path) {
+            println!("ignoring password request for non-configured LUKS device {path:?}");
+            return;
+        }
+
+        //Queue the request for processing
+        println!("queuing password request for LUKS device {path:?}");
 
         self.request_tx
             .try_send(req)
