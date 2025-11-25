@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::Path, process::ExitCode, sync::Arc};
+use std::{collections::HashSet, os::fd::AsRawFd, path::Path, process::ExitCode, sync::Arc};
 
 mod control_server;
 mod failsafe;
@@ -34,6 +34,40 @@ fn main() -> ExitCode {
         default_panic(info);
         std::process::abort();
     }));
+
+    //Force-claim ownership of the tty associated with our VT (i.e. /dev/tty1) to prevent systemd from showing password prompts there
+    fn claim_tty() -> std::io::Result<std::fs::File> {
+        let tty = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open("/dev/tty1")?;
+
+        //Claim the terminal
+        nix::ioctl_write_int_bad!(tiocsctty, nix::libc::TIOCSCTTY);
+        unsafe { tiocsctty(tty.as_raw_fd(), 1) }?;
+
+        //Disable echoing (since user input would otherwise be visible once we terminate)
+        let mut termios = nix::sys::termios::tcgetattr(&tty)?;
+
+        termios
+            .local_flags
+            .set(nix::sys::termios::LocalFlags::ECHO, false);
+        termios
+            .local_flags
+            .set(nix::sys::termios::LocalFlags::ICANON, false);
+
+        nix::sys::termios::tcsetattr(&tty, nix::sys::termios::SetArg::TCSANOW, &termios)?;
+
+        Ok(tty)
+    }
+
+    let _tty_claim = match claim_tty() {
+        Ok(c) => Some(c),
+        Err(err) => {
+            eprintln!("failed to claim fbcon VT TTY ownership: {err:#}");
+            None
+        }
+    };
 
     //Register a signal handler for SIGTERM / SIGINT
     let mut signals =

@@ -503,6 +503,7 @@ dependencies = [
  "evdev",
  "gethostname",
  "inotify",
+ "nix 0.30.1",
  "rust-ini",
  "serde",
  "smol",

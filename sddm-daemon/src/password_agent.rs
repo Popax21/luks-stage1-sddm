@@ -105,6 +105,15 @@ impl PasswordRequest {
     }
 
     pub async fn reply(self, password: Option<Zeroizing<Box<str>>>) -> Result<()> {
+        if !self.socket_path.exists() {
+            //Someone else already replied to the request first
+            println!(
+                "attempted to reply to stale password request for {:?}",
+                self.id.as_deref().unwrap_or("<unknown>")
+            );
+            return Ok(());
+        }
+
         //Don't write into the socket directly; instead run
         //systemd-reply-password
         // - we don't use pkexec since it's not present in the initrd, but

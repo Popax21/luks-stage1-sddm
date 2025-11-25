@@ -9,6 +9,7 @@ async-signal = "0.2.13"
 evdev = "0.13.2"
 gethostname = "1.0.2"
 inotify = { version = "0.11.0", default-features = false }
+nix = { version = "0.30.1", features = ["ioctl", "term"] }
 rust-ini = "0.21.1"
 serde = "1.0.228"
 smol = "2.0.2"

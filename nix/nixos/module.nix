@@ -88,7 +88,7 @@ in {
         services.luks-sddm = {
           description = "SDDM Graphical LUKS Unlock";
           after = ["systemd-sysctl.service" "systemd-udevd.service" "localfs.target"];
-          before = ["cryptsetup-pre.target"];
+          before = ["cryptsetup-pre.target" "systemd-ask-password-console.service"];
           wantedBy = ["cryptsetup.target"];
           unitConfig.DefaultDependencies = false;
 
@@ -112,7 +112,6 @@ in {
           environment = {
             QT_QPA_PLATFORM = "linuxfb";
             QT_QPA_FB_DRM = "1";
-            QT_QPA_EVDEV_KEYBOARD_PARAMETERS = "grab=1";
           };
         };
 
