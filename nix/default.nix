@@ -1,6 +1,6 @@
 {
   pkgs ? import <nixpkgs> {},
-  craneLib ?
+  crane ?
     import (
       let
         craneInput = (builtins.fromJSON (builtins.readFile ../flake.lock)).nodes.crane.locked;
@@ -9,6 +9,6 @@
           url = "https://github.com/${craneInput.owner}/${craneInput.repo}";
           inherit (craneInput) rev;
         }
-    ) {inherit pkgs;},
+    ),
 }:
-pkgs.callPackages ./packages.nix {inherit craneLib;}
+import ./packages.nix {inherit pkgs crane;}

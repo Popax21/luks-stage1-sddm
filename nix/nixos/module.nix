@@ -1,6 +1,5 @@
 {
   config,
-  options,
   lib,
   pkgs,
   ...
@@ -17,41 +16,50 @@
   sddmConfig = iniFmt.generate "initrd-sddm.conf" (lib.recursiveUpdate defaultConfig cfg.settings);
 
   squashedClosurePath = "/luks-sddm-closure.sqsh";
-  squashedClosure =
-    pkgs.runCommand "initrd-sddm-closure" {
-      __structuredAttrs = true;
-      exportReferencesGraph.closure = [cfg.package sddmConfig];
-      unsafeDiscardReferences.out = true;
+  squashedClosure = pkgs.runCommand "initrd-sddm-closure.sqsh" {
+    __structuredAttrs = true;
+    exportReferencesGraph.closure = [cfg.package sddmConfig];
+    unsafeDiscardReferences.out = true;
 
-      basePaths = let
-        defs = lib.flatten (lib.options.getValues options.boot.initrd.systemd.storePaths.definitionsWithLocations);
+    nativeBuildInputs = with pkgs; [python3 squashfsTools];
 
-        filterDefs = d: builtins.typeOf d != "set" || (d.target or null) != squashedClosurePath;
+    excludePatterns = let
+      matchPkg = name: "${builtins.storeDir}/[a-z0-9]+-${name}-[^/]+";
+      matchAllPkgs = "${builtins.storeDir}/[^/]+";
+    in [
+      # - only include /lib / /share
+      "${matchAllPkgs}/"
+      "!${matchAllPkgs}/lib/[^/]+\\.so(.[^/]+)?"
+      "!${matchAllPkgs}/lib/qt-6/"
+      "!${matchAllPkgs}/share/"
+      "${matchAllPkgs}/share/doc/"
+      "${matchAllPkgs}/share/man/"
+      "${matchAllPkgs}/share/i18n/"
+      "${matchAllPkgs}/share/locale/"
+      "${matchAllPkgs}/share/pkgconfig/"
 
-        defToStorePath = d:
-          toString (
-            if builtins.typeOf d == "set"
-            then d.outPath or d.source
-            else d
-          );
-      in
-        map defToStorePath (builtins.filter filterDefs defs);
+      # - exclude libasan / libtsan / ... 
+      "${matchPkg "gcc"}/lib/"
+      "!${matchPkg "gcc"}/lib/libgcc_s.so(.[^/]+)?"
+      "!${matchPkg "gcc"}/lib/libstdc\\+\\+.so(.[^/]+)?"
+      "!${matchPkg "gcc"}/lib/libgomp.so(.[^/]+)?"
 
-      nativeBuildInputs = with pkgs; [jq squashfsTools];
-    } ''
-      mapfile -t closure < <(cat "$NIX_ATTRS_JSON_FILE" | jq -r '.closure[].path' | xargs -i find {} -type f -or -type l | sort -u)
-      mapfile -t basePaths < <(cat "$NIX_ATTRS_JSON_FILE" | jq -r '.basePaths[]' | xargs -i find {} -type f -or -type l | sort -u)
+      # - bunch of package-specific fixups
+      "${matchPkg "hwdata"}/" # - we don't need hwdata
+      "${matchPkg "glib"}/lib/(?!libglib-2.0.so)[^/]+" # - we only need libglib-2.0.so
+      "${matchPkg "systemd-minimal-libs"}/lib/(?!libudev.so)[^/]+" # - we only need udev
+      "!${matchPkg "xkeyboard-config"}/etc" # - is a symlink
+      "!${matchPkg "glibc"}/lib/locale/C.utf8/" # - required for UTF-8 locale support
 
-      mapfile -t commonPaths < <((IFS=$'\n'; echo "''${closure[*]}"; echo "''${basePaths[*]}") | sort | uniq -d)
-      mapfile -t toCompress < <((IFS=$'\n'; echo "''${closure[*]}"; echo "''${commonPaths[*]}") | sort | uniq -u)
-
-      echo "Compressing ''${#toCompress[@]} files (''${#closure[@]} total, skipping ''${#commonPaths[@]} common files)"
-      (IFS=$'\n'; echo "''${toCompress[*]}") | mksquashfs - "$out" -quiet -no-strip -cpiostyle -comp xz
-    '';
+      # - include the binaries we actually use
+      "!${lib.getExe' cfg.package "luks-stage1-sddm-daemon"}"
+      "!${matchPkg "sddm-minimal"}/bin/sddm-greeter-qt6"
+    ];
+  } "python3 ${./build-closure.py}";
 in {
   options.boot.initrd.luks.sddmUnlock = {
     enable = lib.mkEnableOption "LUKS unlock using SDDM in initrd";
-    package = lib.mkPackageOption pkgs "luks-stage1-sddm" {};
+    package = lib.mkPackageOption pkgs.luks-stage1-sddm "luks-stage1-sddm" {pkgsText = "pkgs.luks-stage1-sddm";};
 
     users = lib.mkOption {
       type = lib.types.listOf lib.types.str;
@@ -91,12 +99,13 @@ in {
         #Setup the SDDM service
         services.luks-sddm = {
           description = "SDDM Graphical LUKS Unlock";
-          after = ["systemd-sysctl.service" "systemd-udevd.service" "systemd-ask-password-console.service" "localfs.target"];
-          before = ["cryptsetup-pre.target"];
+
+          after = ["systemd-sysctl.service" "systemd-udevd.service" "localfs.target"];
+          before = ["cryptsetup-pre.target" "systemd-ask-password-console.service"];
           wantedBy = ["cryptsetup.target"];
           unitConfig.DefaultDependencies = false;
 
-          serviceConfig.ExecStart = "${lib.getExe cfg.package} ${lib.escapeShellArg (toString sddmConfig)}";
+          serviceConfig.ExecStart = "${lib.getExe' cfg.package "luks-stage1-sddm-daemon"} ${lib.escapeShellArg (toString sddmConfig)}";
 
           # - mount the squashed closure before startup
           preStart = ''
@@ -109,6 +118,7 @@ in {
           postStop = ''
             if [ "$SERVICE_RESULT" != "success" ]; then
               cat /sys/class/graphics/fbcon/rotate > /sys/class/graphics/fbcon/rotate
+              systemctl try-restart systemd-ask-password-console.service
             fi
           '';
 

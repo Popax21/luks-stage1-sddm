@@ -3,7 +3,7 @@
   imports = [./module.nix];
   config.nixpkgs.overlays = [
     (final: prev: {
-      inherit (import ./.. {pkgs = final;}) luks-stage1-sddm;
+      luks-stage1-sddm = import ./.. {pkgs = final;};
     })
   ];
 }

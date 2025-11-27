@@ -1,22 +1,32 @@
 {
   pkgs,
-  lib,
-  craneLib,
+  crane,
 }:
-lib.makeScope pkgs.newScope (self: {
-  cargoArtifacts = craneLib.buildDepsOnly {
+pkgs.lib.makeScope pkgs.newScope (self: {
+  craneLib = crane self;
+  cargoArtifacts = self.craneLib.buildDepsOnly {
     src = ./..;
     strictDeps = true;
   };
 
-  luks-stage1-sddm = craneLib.buildPackage {
-    src = ./..;
-    strictDeps = true;
-    inherit (self) cargoArtifacts;
+  qtbase-minimal = self.callPackage ./minimal-qtbase.nix {};
+  sddm-minimal = self.callPackage ./minimal-sddm.nix {};
 
-    EXE_SDDM_GREETER = lib.getExe' pkgs.kdePackages.sddm "sddm-greeter-qt6";
-    EXE_REPLY_PASSWORD = "${pkgs.systemd}/lib/systemd/systemd-reply-password";
+  luks-stage1-sddm = self.callPackage (
+    {
+      lib,
+      craneLib,
+      cargoArtifacts,
+      sddm-minimal,
+    }:
+      craneLib.buildPackage {
+        src = craneLib.cleanCargoSource ./..;
+        strictDeps = true;
+        inherit cargoArtifacts;
 
-    meta.mainProgram = "luks-stage1-sddm-daemon";
-  };
+        EXE_SDDM_GREETER = lib.getExe' sddm-minimal "sddm-greeter-qt6";
+
+        meta.mainProgram = "luks-stage1-sddm-daemon";
+      }
+  ) {};
 })

@@ -14,23 +14,25 @@
     crane,
     ...
   }:
-    (flake-utils.lib.eachDefaultSystem (system: let
+    (flake-utils.lib.eachSystem (builtins.filter (nixpkgs.lib.hasInfix "linux") flake-utils.lib.defaultSystems) (system: let
       pkgs = nixpkgs.legacyPackages.${system};
-      craneLib = crane.mkLib pkgs;
-      flakePkgs = pkgs.callPackage nix/packages.nix {inherit craneLib;};
+      flakePkgs = import nix/packages.nix {
+        inherit pkgs;
+        crane = crane.mkLib;
+      };
     in rec {
       packages = rec {
-        inherit (flakePkgs) luks-stage1-sddm;
+        inherit (flakePkgs) qtbase-minimal sddm-minimal luks-stage1-sddm;
         default = luks-stage1-sddm;
       };
 
       checks =
         packages
         // {
-          rustfmt = craneLib.cargoFmt {
+          rustfmt = flakePkgs.craneLib.cargoFmt {
             src = ./.;
           };
-          clippy = craneLib.cargoClippy {
+          clippy = flakePkgs.craneLib.cargoClippy {
             src = ./.;
 
             inherit (flakePkgs) cargoArtifacts;
@@ -38,20 +40,23 @@
           };
         };
 
-      devShells.default = craneLib.devShell {
+      devShells.default = flakePkgs.craneLib.devShell {
         checks = checks;
         packages = with pkgs; [
           clippy
           rust-analyzer
         ];
-        propagatedBuildInputs = [flakePkgs.cargoArtifacts]; # - keep our cargo artifacts alive as part of the direnv GC root
+        propagatedBuildInputs = [flakePkgs.cargoArtifacts flakePkgs.sddm-minimal]; # - keep our cargo artifacts / custom SDDM alive as part of the direnv GC root
       };
 
       apps.devVM = import test/dev_vm.nix {inherit self nixpkgs system;};
     }))
     // rec {
       overlays.default = final: prev: {
-        inherit (final.callPackages nix/packages.nix {craneLib = crane.mkLib final;}) luks-stage1-sddm;
+        luks-stage1-sddm = import nix/packages.nix {
+          pkgs = final;
+          crane = crane.mkLib;
+        };
       };
 
       nixosModules.default = {

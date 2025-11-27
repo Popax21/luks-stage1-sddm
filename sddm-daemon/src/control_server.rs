@@ -38,7 +38,7 @@ pub async fn greeter_control_server(socket_path: PathBuf, controller: Arc<impl G
         conns.push(smol::spawn(async move {
             println!("accepted greeter control socket connection {conn_id}");
             if let Err(err) = greeter_control_connection(conn, controller).await {
-                eprintln!("failed to handle greeter connection {conn_id}: {err:?}");
+                eprintln!("failed to handle greeter connection {conn_id}: {err:#}");
             } else {
                 println!("greeter control socket connection {conn_id} was closed");
             }
@@ -207,7 +207,14 @@ async fn recv_msg(stream: &mut (impl AsyncRead + Unpin)) -> std::io::Result<Opti
     let mut buf = [0u8; 4];
     match stream.read_exact(&mut buf).await {
         Ok(_) => Ok(Some(u32::from_be_bytes(buf))),
-        Err(err) if err.kind() == ErrorKind::UnexpectedEof => Ok(None),
+        Err(err)
+            if matches!(
+                err.kind(),
+                ErrorKind::UnexpectedEof | ErrorKind::ConnectionReset
+            ) =>
+        {
+            Ok(None)
+        }
         Err(err) => Err(err),
     }
 }

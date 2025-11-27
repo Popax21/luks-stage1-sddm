@@ -272,7 +272,7 @@ impl GreeterController for Controller {
             //Answer the request
             println!("responding to password request from {id}");
 
-            if let Err(err) = req.reply(Some(password.clone())).await {
+            if let Err(err) = req.reply(Some(password.clone())) {
                 eprintln!("failed to reply to password request: {err:#}")
             }
         }

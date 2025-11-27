@@ -2,16 +2,14 @@
 
 use std::{
     io::ErrorKind,
-    os::fd::AsFd,
+    os::{fd::AsFd, unix::net::UnixDatagram},
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result, ensure};
+use anyhow::{Context, Result};
 use inotify::{Inotify, WatchMask};
 use smol::{
     Async,
-    io::AsyncWriteExt,
-    process::{Command, Stdio},
     stream::{Stream, StreamExt},
 };
 use zeroize::Zeroizing;
@@ -104,44 +102,28 @@ impl PasswordRequest {
         })
     }
 
-    pub async fn reply(self, password: Option<Zeroizing<Box<str>>>) -> Result<()> {
-        if !self.socket_path.exists() {
-            //Someone else already replied to the request first
-            println!(
-                "attempted to reply to stale password request for {:?}",
-                self.id.as_deref().unwrap_or("<unknown>")
-            );
-            return Ok(());
+    pub fn reply(self, password: Option<Zeroizing<Box<str>>>) -> Result<()> {
+        let socket = UnixDatagram::unbound().context("failed to open client socket")?;
+
+        match socket.connect(&self.socket_path) {
+            Ok(()) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                //Someone else already replied to the request first
+                println!(
+                    "attempted to reply to stale password request for {:?}",
+                    self.id.as_deref().unwrap_or("<unknown>")
+                );
+                return Ok(());
+            }
+            Err(err) => return Err(err).context("failed to connect to password request socket"),
         }
 
-        //Don't write into the socket directly; instead run
-        //systemd-reply-password
-        // - we don't use pkexec since it's not present in the initrd, but
-        //   we still don't write into the socket ourselves since the reply
-        //   program might be a wrapper with setuid permissions
-        let mut child =
-            Command::new(option_env!("EXE_REPLY_PASSWORD").unwrap_or("systemd-reply-password"))
-                .arg(if password.is_some() { "1" } else { "0" })
-                .arg(self.socket_path)
-                .stdin(Stdio::piped())
-                .spawn()
-                .context("failed to run systemd-reply-password")?;
-
         if let Some(password) = password {
-            child
-                .stdin
-                .as_mut()
-                .unwrap()
-                .write_all(password.as_bytes())
-                .await
-                .context("failed to write password to stdin")?;
-        };
-
-        let status = child.status().await?;
-        ensure!(
-            status.success(),
-            "systemd-reply-password exited with status {status}"
-        );
+            socket.send(format!("+{}", *password).as_bytes())
+        } else {
+            socket.send(b"-")
+        }
+        .context("failed to send password reply to password request socket")?;
 
         Ok(())
     }

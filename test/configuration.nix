@@ -80,7 +80,7 @@
     services.journald.console = "/dev/ttyS0";
     boot.initrd.systemd.contents."/etc/systemd/journald.conf".source = config.environment.etc."systemd/journald.conf".source;
 
-    boot.kernelParams = ["rd.systemd.unit=rescue.target"];
+    # boot.kernelParams = ["rd.systemd.unit=rescue.target"];
     boot.initrd.systemd = {
       emergencyAccess = true;
       extraBin = {
