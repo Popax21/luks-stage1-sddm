@@ -118,6 +118,7 @@ in {
           wantedBy = ["cryptsetup.target"];
           unitConfig.DefaultDependencies = false;
 
+          serviceConfig.Type = "notify";
           serviceConfig.ExecStart = "${lib.getExe' cfg.package "luks-stage1-sddm-daemon"} ${lib.escapeShellArg (toString sddmConfig)}";
 
           # - mount the squashed closure before startup

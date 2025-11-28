@@ -136,6 +136,9 @@ fn main() -> ExitCode {
         };
 
         //Wait until we receive a SIGTERM / SIGINT signal, or the greeter finishes
+        sd_notify::notify(true, &[sd_notify::NotifyState::Ready])
+            .expect("failed to send sd-notify ready notification");
+
         let mut failsafe_engaged = false;
         smol::future::or(
             smol::future::or(
