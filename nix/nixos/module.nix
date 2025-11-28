@@ -5,12 +5,29 @@
   ...
 }: let
   cfg = config.boot.initrd.luks.sddmUnlock;
+  dmCfg = config.services.displayManager;
 
-  defaultConfig = {
-    General.DisplayServer = "wayland";
-    Theme.Current = cfg.theme;
-    LUKSUnlock.Devices = map (name: config.boot.initrd.luks.devices.${name}.device) cfg.luksDevices;
-  };
+  defaultConfig =
+    {
+      Theme.Current = cfg.theme;
+      LUKSUnlock.Devices = map (name: config.boot.initrd.luks.devices.${name}.device) cfg.luksDevices;
+    }
+    // (let
+      stubbedSessions =
+        pkgs.runCommandLocal "desktops-stubbed" {
+          __structuredAttrs = true;
+          unsafeDiscardReferences.out = true;
+        } ''
+          cp -rL ${dmCfg.sessionData.desktops} $out
+          chmod -R u+w $out
+          find $out -type f -exec sed -i '/Exec=/d' {} \;
+        '';
+    in
+      lib.optionalAttrs dmCfg.enable {
+        General.DefaultSession = lib.optionalString (dmCfg.defaultSession != null) "${dmCfg.defaultSession}.desktop";
+        X11.SessionDir = "${stubbedSessions}/share/xsessions";
+        Wayland.SessionDir = "${stubbedSessions}/share/wayland-sessions";
+      });
 
   iniFmt = pkgs.formats.ini {listsAsDuplicateKeys = true;};
   sddmConfig = iniFmt.generate "initrd-sddm.conf" (lib.recursiveUpdate defaultConfig cfg.settings);
