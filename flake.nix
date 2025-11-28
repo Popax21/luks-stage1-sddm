@@ -1,5 +1,5 @@
 {
-  description = "Unlock LUKS drives using SDDM from NixOS stage1";
+  description = "Unlock LUKS drives using SDDM from NixOS stage1 / initrd";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -60,7 +60,12 @@
       };
 
       nixosModules.default = {
-        imports = [nix/nixos/module.nix];
+        imports = [
+          nix/nixos/module.nix
+          {
+            boot.initrd.luks.sddmUnlock.pinPkgs = nixpkgs.lib.mkDefault (system: nixpkgs.legacyPackages.${system});
+          }
+        ];
         config.nixpkgs.overlays = [overlays.default];
       };
     };

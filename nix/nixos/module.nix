@@ -38,7 +38,7 @@
       "${matchAllPkgs}/share/locale/"
       "${matchAllPkgs}/share/pkgconfig/"
 
-      # - exclude libasan / libtsan / ... 
+      # - exclude libasan / libtsan / ...
       "${matchPkg "gcc"}/lib/"
       "!${matchPkg "gcc"}/lib/libgcc_s.so(.[^/]+)?"
       "!${matchPkg "gcc"}/lib/libstdc\\+\\+.so(.[^/]+)?"
@@ -61,13 +61,26 @@ in {
     enable = lib.mkEnableOption "LUKS unlock using SDDM in initrd";
     package = lib.mkPackageOption pkgs.luks-stage1-sddm "luks-stage1-sddm" {pkgsText = "pkgs.luks-stage1-sddm";};
 
+    pinPkgs = lib.mkOption {
+      type = lib.types.nullOr (lib.types.functionTo lib.types.attrs);
+      default = null;
+      description = ''
+        Pin the SDDM initrd packages to the specific nixpkgs instance.
+        Can be used to prevent excessive rebuilds of the squashed SDDM closure.
+        When using the flake entrypoint, this will default to the locked nixpkgs input.
+      '';
+    };
+
     users = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       description = "Users which should be available to log in as.";
     };
     luksDevices = lib.mkOption {
       type = lib.types.listOf lib.types.str;
-      description = "The name of LUKS devices that will be unlocked using SDDM. There must be a corresponding entry in `boot.initrd.luks.devices` for each listed device.";
+      description = ''
+        The name of LUKS devices that will be unlocked using SDDM.
+        There must be a corresponding entry in `boot.initrd.luks.devices` for each listed device.
+      '';
     };
 
     theme = lib.mkOption {
@@ -146,5 +159,9 @@ in {
       #Configure infinite retries for all devices we should unlock
       luks.devices = lib.genAttrs cfg.luksDevices (_: {crypttabExtraOpts = ["tries=0"];});
     };
+
+    nixpkgs.overlays = lib.optional (cfg.pinPkgs != null) (final: prev: {
+      luks-stage1-sddm = prev.luks-stage1-sddm.overrideScope (cfg.pinPkgs final.stdenv.targetPlatform.system);
+    });
   };
 }
