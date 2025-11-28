@@ -8,8 +8,8 @@ pub fn start_failsafe() -> Result<impl Future<Output = ()>> {
     let mut poll_attempt = 0;
     while !std::fs::exists("/dev/input").context("failed to poll for /dev/input creation")? {
         poll_attempt += 1;
-        ensure!(poll_attempt <= 20, "/dev/input does not exist");
-        std::thread::sleep(Duration::from_millis(50));
+        ensure!(poll_attempt <= 25, "/dev/input does not exist");
+        std::thread::sleep(Duration::from_millis(200));
     }
 
     //Grab all keyboard evdev devices
