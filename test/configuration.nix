@@ -10,18 +10,27 @@
     "${modulesPath}/virtualisation/qemu-vm.nix"
     flake.nixosModules.default
   ];
-  config = {
+  config = let
+    sideload = config.boot.initrd.luks.sddmUnlock.sideloadClosure;
+  in {
     system.stateVersion = "24.05";
 
     #Configure the VM
     nix.enable = false;
     virtualisation = {
-      diskImage = null;
+      diskImage = lib.mkIf (!sideload) null;
       graphics = true;
       restrictNetwork = true;
+      useBootLoader = lib.mkIf sideload true;
+      useEFIBoot = lib.mkIf sideload true;
       qemu.options = ["-serial stdio"];
     };
     networking.dhcpcd.enable = false;
+
+    boot.loader = lib.mkIf sideload {
+      timeout = 0;
+      systemd-boot.enable = true;
+    };
 
     #Setup the testing user
     users.users.tester = {
@@ -71,6 +80,7 @@
       enable = true;
       users = ["tester"];
       luksDevices = ["test-drive"];
+      # sideloadClosure = true; # - expensive to test!
     };
 
     boot.initrd.systemd.services.luks-sddm.environment.RUST_BACKTRACE = "1";
@@ -80,12 +90,12 @@
     services.journald.console = "/dev/ttyS0";
     boot.initrd.systemd.contents."/etc/systemd/journald.conf".source = config.environment.etc."systemd/journald.conf".source;
 
-    # boot.kernelParams = ["rd.systemd.unit=rescue.target"];
+    boot.kernelParams = ["rd.systemd.unit=rescue.target"];
     boot.initrd.systemd = {
       emergencyAccess = true;
       extraBin = {
-        ldd = lib.getExe' pkgs.glibc "ldd";
         grep = lib.getExe pkgs.gnugrep;
+        dmesg = lib.getExe' pkgs.util-linux "dmesg";
       };
     };
   };

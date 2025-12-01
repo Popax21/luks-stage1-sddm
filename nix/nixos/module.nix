@@ -1,5 +1,6 @@
 {
   config,
+  options,
   lib,
   pkgs,
   ...
@@ -73,6 +74,8 @@
       "!${matchPkg "sddm-minimal"}/bin/sddm-greeter-qt6"
     ];
   } "python3 ${./build-closure.py}";
+
+  efiDir = config.boot.loader.efi.efiSysMountPoint;
 in {
   options.boot.initrd.luks.sddmUnlock = {
     enable = lib.mkEnableOption "LUKS unlock using SDDM in initrd";
@@ -85,6 +88,16 @@ in {
         Pin the SDDM initrd packages to the specific nixpkgs instance.
         Can be used to prevent excessive rebuilds of the squashed SDDM closure.
         When using the flake entrypoint, this will default to the locked nixpkgs input.
+      '';
+    };
+
+    sideloadClosure = lib.mkOption {
+      type = lib.types.bool;
+      default = config.boot.loader.systemd-boot.enable || (config.boot.loader.grub.enable && config.boot.loader.grub.efiSupport);
+      defaultText = lib.literalExpression ''config.boot.loader.systemd-boot.enable || (config.boot.loader.grub.enable && config.boot.loader.grub.efiSupport)'';
+      description = ''
+        Don't store the squashed SDDM closure in the initrd itself, and instead store it directly on the EFI partition.
+        This can be used to reduce the size of the generated initrd.
       '';
     };
 
@@ -118,12 +131,42 @@ in {
       systemd = {
         enable = true;
 
-        #Copy the squashed closure into the initrd
-        storePaths = [
+        #Copy the squashed closure into the initrd (unless we're sideloading it)
+        storePaths = lib.mkIf (!cfg.sideloadClosure) [
           {
             source = squashedClosure;
             target = squashedClosurePath;
           }
+        ];
+
+        #If we're sideloading copy the closure from the EFI partition
+        services.luks-sddm-acquire-closure = lib.mkIf cfg.sideloadClosure {
+          description = "Acquire SDDM Closure for Graphical LUKS Unlock";
+
+          before = ["luks-sddm.service"];
+          requiredBy = ["luks-sddm.service"];
+          unitConfig.DefaultDependencies = false;
+
+          unitConfig.RequiresMountsFor = "/efi";
+          unitConfig.ConditionPathExists = "/efi/${squashedClosurePath}";
+
+          serviceConfig.Type = "oneshot";
+          script = ''
+            cp "/efi/${squashedClosurePath}" "${squashedClosurePath}"
+          '';
+        };
+        mounts = lib.mkIf cfg.sideloadClosure [
+          (let
+            efiFs = config.fileSystems.${efiDir};
+          in
+            assert efiFs.enable;
+            assert efiFs.depends == [];
+            assert !efiFs.encrypted.enable; {
+              what = efiFs.device;
+              where = "/efi";
+              type = efiFs.fsType;
+              options = lib.concatStringsSep "," (["ro"] ++ (lib.remove "rw" efiFs.options));
+            })
         ];
 
         #Setup the SDDM service
@@ -144,6 +187,7 @@ in {
             mount -t squashfs -o loop ${lib.escapeShellArg squashedClosurePath} /tmp/luks-sddm-closure
             mount -t overlay overlay -o lowerdir=${builtins.storeDir}:/tmp/luks-sddm-closure${builtins.storeDir} ${builtins.storeDir}
           '';
+          unitConfig.ConditionPathExists = squashedClosurePath;
 
           # - if we fail, refresh the system's fbcon
           postStop = ''
@@ -171,15 +215,39 @@ in {
       };
 
       #We need to enable support for some things we need to have early in initrd
-      supportedFilesystems.squashfs = true;
-      availableKernelModules = ["evdev"]; # - required for input / etc.
+      supportedFilesystems = lib.mkMerge [
+        {
+          squashfs = true;
+          overlay = true;
+        }
+        (lib.mkIf cfg.sideloadClosure {
+          ${config.fileSystems.${efiDir}.fsType} = true;
+        })
+      ];
+
+      availableKernelModules = ["evdev" "overlay"]; # - required for input / etc.
 
       #Configure infinite retries for all devices we should unlock
       luks.devices = lib.genAttrs cfg.luksDevices (_: {crypttabExtraOpts = ["tries=0"];});
     };
 
+    #Pin the initrd closure packages (if enabled)
     nixpkgs.overlays = lib.optional (cfg.pinPkgs != null) (final: prev: {
       luks-stage1-sddm = prev.luks-stage1-sddm.overrideScope (cfg.pinPkgs final.stdenv.targetPlatform.system);
     });
+
+    #Copy the squashed closure directly to the EFI partition (if enabled)
+    system.build.installBootLoader = lib.mkIf cfg.sideloadClosure (
+      let
+        buildOpt = options.system.build;
+        buildDefs = builtins.filter (d: d.file != (toString ./module.nix)) buildOpt.definitionsWithLocations;
+        buildVal = buildOpt.type.merge buildOpt.loc buildDefs;
+      in
+        lib.mkForce (pkgs.writeShellScript "install-bootloader-hooked" ''
+          ${buildVal.installBootLoader} "$@"
+          echo "Installing squashed SDDM initrd closure for graphical LUKS unlock"
+          cp ${squashedClosure} "${efiDir}/${squashedClosurePath}"
+        '')
+    );
   };
 }
