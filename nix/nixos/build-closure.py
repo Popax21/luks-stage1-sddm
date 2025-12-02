@@ -3,6 +3,7 @@ import os
 import pathlib
 import re
 import subprocess
+import hashlib
 
 with open(os.environ["NIX_ATTRS_JSON_FILE"], "r") as f:
     attrs = json.load(f)
@@ -81,3 +82,7 @@ subprocess.run(
 
 closure_size = os.stat(compressed_closure).st_size
 print(f" - done; compressed closure size {closure_size / 1024 / 1024:.3f}MB")
+
+with open(compressed_closure, "rb") as f:
+    digest = hashlib.sha256(f.read()).hexdigest()
+    pathlib.Path(os.environ["hash"]).write_text(digest)

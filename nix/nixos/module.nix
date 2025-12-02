@@ -39,6 +39,7 @@
     exportReferencesGraph.closure = [cfg.package sddmConfig];
     unsafeDiscardReferences.out = true;
 
+    outputs = ["out" "hash"];
     nativeBuildInputs = with pkgs; [python3 squashfsTools];
 
     excludePatterns = let
@@ -131,13 +132,19 @@ in {
       systemd = {
         enable = true;
 
-        #Copy the squashed closure into the initrd (unless we're sideloading it)
-        storePaths = lib.mkIf (!cfg.sideloadClosure) [
-          {
-            source = squashedClosure;
-            target = squashedClosurePath;
-          }
-        ];
+        #Copy the squashed closure into the initrd (unless we're sideloading it, then we just need to copy its hash)
+        storePaths =
+          if !cfg.sideloadClosure
+          then [
+            {
+              source = squashedClosure;
+              target = squashedClosurePath;
+            }
+          ]
+          else [
+            squashedClosure.hash
+            (lib.getExe' pkgs.coreutils "sha256sum")
+          ];
 
         #If we're sideloading copy the closure from the EFI partition
         services.luks-sddm-acquire-closure = lib.mkIf cfg.sideloadClosure {
@@ -151,8 +158,17 @@ in {
           unitConfig.ConditionPathExists = "/efi/${squashedClosurePath}";
 
           serviceConfig.Type = "oneshot";
-          script = ''
-            cp "/efi/${squashedClosurePath}" "${squashedClosurePath}"
+          script = let
+            escp = lib.escapeShellArg squashedClosurePath;
+          in ''
+            cp /efi/${escp} ${escp}-unver
+            if sha256sum -c --status --strict <(echo $(cat ${squashedClosure.hash}) ${escp}-unver); then
+              echo squashed LUKS closure hash OK
+              mv ${escp}-unver ${escp}
+            else
+              echo squashed LUKS closure hash mismatch! >&2
+              exit 1
+            fi
           '';
         };
         mounts = lib.mkIf cfg.sideloadClosure [
