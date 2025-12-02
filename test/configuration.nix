@@ -26,11 +26,14 @@
       qemu.options = ["-serial stdio"];
     };
     networking.dhcpcd.enable = false;
+    services.journald.console = "/dev/ttyS0";
 
     boot.loader = lib.mkIf sideload {
       timeout = 0;
       systemd-boot.enable = true;
     };
+
+    time.timeZone = "Europe/Vienna";
 
     #Setup the testing user
     users.users.tester = {
@@ -75,28 +78,27 @@
       };
     };
 
-    #Enable luks-stage1-sddm
-    boot.initrd.luks.sddmUnlock = {
-      enable = true;
-      users = ["tester"];
-      luksDevices = ["test-drive"];
-      # sideloadClosure = true; # - expensive to test!
-    };
-
-    boot.initrd.systemd.services.luks-sddm.environment.RUST_BACKTRACE = "1";
-    boot.initrd.availableKernelModules = ["bochs"]; # - required to get DRI/DRM working in the initrd
-
-    #Drop a shell in the stage 1 initrd
-    services.journald.console = "/dev/ttyS0";
-    boot.initrd.systemd.contents."/etc/systemd/journald.conf".source = config.environment.etc."systemd/journald.conf".source;
-
-    boot.kernelParams = ["rd.systemd.unit=rescue.target"];
+    #Setup debugging in the initrd
     boot.initrd.systemd = {
       emergencyAccess = true;
       extraBin = {
         grep = lib.getExe pkgs.gnugrep;
         dmesg = lib.getExe' pkgs.util-linux "dmesg";
       };
+      contents."/etc/systemd/journald.conf".source = config.environment.etc."systemd/journald.conf".source;
     };
+
+    # boot.kernelParams = ["rd.systemd.unit=rescue.target"]; # - use this to drop a shell in the stage 1 initrd
+
+    #Enable luks-stage1-sddm
+    boot.initrd.luks.sddmUnlock = {
+      enable = true;
+      users = ["tester"];
+      luksDevices = ["test-drive"];
+      sideloadClosure = false; # true; # - expensive to test!
+    };
+
+    boot.initrd.systemd.services.luks-sddm.environment.RUST_BACKTRACE = "1";
+    boot.initrd.availableKernelModules = ["bochs"]; # - required to get DRI/DRM working in the initrd
   };
 }

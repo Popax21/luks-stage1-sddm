@@ -132,19 +132,29 @@ in {
       systemd = {
         enable = true;
 
-        #Copy the squashed closure into the initrd (unless we're sideloading it, then we just need to copy its hash)
-        storePaths =
-          if !cfg.sideloadClosure
-          then [
+        storePaths = lib.mkMerge [
+          #Copy the squashed closure into the initrd
+          (lib.mkIf (!cfg.sideloadClosure) [
             {
               source = squashedClosure;
               target = squashedClosurePath;
             }
-          ]
-          else [
+          ])
+
+          # - unless we're sideloading it, then we just need to copy its hash (and the tools to validate it)
+          (lib.mkIf cfg.sideloadClosure [
             squashedClosure.hash
             (lib.getExe' pkgs.coreutils "sha256sum")
-          ];
+          ])
+
+          #Set the timezone if configured
+          (lib.mkIf (config.time.timeZone != null) [
+            {
+              source = "${pkgs.tzdata}/share/zoneinfo/${config.time.timeZone}";
+              target = "/etc/localtime";
+            }
+          ])
+        ];
 
         #If we're sideloading copy the closure from the EFI partition
         services.luks-sddm-acquire-closure = lib.mkIf cfg.sideloadClosure {
