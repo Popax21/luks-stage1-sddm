@@ -90,6 +90,28 @@
 
     # boot.kernelParams = ["rd.systemd.unit=rescue.target"]; # - use this to drop a shell in the stage 1 initrd
 
+    #Enable a minimal stub DM + DE
+    services.displayManager = {
+      sddm = {
+        enable = true;
+        wayland.enable = true;
+      };
+      sessionPackages = [
+        (pkgs.writeTextFile {
+          name = "fake-de-session";
+          destination = "/share/wayland-sessions/fake-de.desktop";
+          passthru.providedSessions = ["fake-de"];
+          text = ''
+            [Desktop Entry]
+            DesktopNames=FakeDE
+            Name=Fake Desktop Environment
+            Exec=sleep 5
+            TryExec=/bin/sh
+          '';
+        })
+      ];
+    };
+
     #Enable luks-stage1-sddm
     boot.initrd.luks.sddmUnlock = {
       enable = true;

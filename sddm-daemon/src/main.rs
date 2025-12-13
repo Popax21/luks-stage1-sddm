@@ -18,15 +18,17 @@ use zeroize::Zeroizing;
 
 fn main() -> ExitCode {
     //Parse the SDDM config file we're given
-    let Some(sddm_config) = std::env::args().nth(1) else {
+    let Some(sddm_config_path) = std::env::args().nth(1) else {
         eprintln!(
             "Usage: {:?} <SDDM config file>",
             std::env::current_exe().unwrap_or_default()
         );
         return ExitCode::FAILURE;
     };
-    let sddm_config = SddmConfig::load_from_file(Path::new(&sddm_config))
-        .expect("failed to load SDDM config file");
+
+    let sddm_config_path = Path::new(&sddm_config_path);
+    let sddm_config =
+        SddmConfig::load_from_file(sddm_config_path).expect("failed to load SDDM config file");
 
     //Setup an abort panic handler; we should never panic, and we don't have any panic propagation / handling in place
     let default_panic = std::panic::take_hook();
@@ -123,7 +125,11 @@ fn main() -> ExitCode {
         let mut greeter = {
             let mut cmd =
                 Command::new(option_env!("EXE_SDDM_GREETER").unwrap_or("sddm-greeter-qt6"));
-            let cmd = cmd.arg("--socket").arg(&socket_path);
+
+            let cmd = cmd
+                .env("SDDM_CONFIG", sddm_config_path)
+                .arg("--socket")
+                .arg(&socket_path);
 
             let cmd = if let Some(theme) = &controller.sddm_config.theme {
                 // - if we have a theme configured, pass that to the greeter

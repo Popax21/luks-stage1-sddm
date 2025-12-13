@@ -21,7 +21,8 @@
         } ''
           cp -rL ${dmCfg.sessionData.desktops} $out
           chmod -R u+w $out
-          find $out -type f -exec sed -i '/Exec=/d' {} \;
+          find $out -type f -exec sed -i "/^Exec=/d" {} \;
+          find $out -type f -exec sed -i "s|Exec=.*|Exec=/proc/self/exe|" {} \;
         '';
     in
       lib.optionalAttrs dmCfg.enable {

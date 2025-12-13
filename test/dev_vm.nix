@@ -15,4 +15,5 @@ in {
   type = "app";
   program = "${vm}/bin/run-nixos-vm";
   meta.description = "Development VM";
+  passthru = {inherit vm;};
 }
