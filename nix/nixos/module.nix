@@ -122,6 +122,13 @@ in {
       defaultText = lib.literalExpression "config.services.displayManager.sddm.theme";
     };
 
+    locale = lib.mkOption {
+      type = lib.types.str;
+      description = "The locale used by the SDDM greeter.";
+      default = config.i18n.defaultLocale;
+      defaultText = lib.literalExpression "config.i18n.defaultLocale";
+    };
+
     settings = lib.mkOption {
       type = iniFmt.type;
       description = "Extra settings merged in and overwriting defaults in sddm.conf.";
@@ -131,10 +138,12 @@ in {
   config = lib.mkIf cfg.enable {
     boot.initrd = {
       systemd = {
+        #We need stage 1 systemd for any of this to work
         enable = true;
 
+        #Copy the squashed closure into the initrd
+        # - unless we're sideloading it, then we just need to copy its hash (and the tools to validate it)
         storePaths = lib.mkMerge [
-          #Copy the squashed closure into the initrd
           (lib.mkIf (!cfg.sideloadClosure) [
             {
               source = squashedClosure;
@@ -142,18 +151,9 @@ in {
             }
           ])
 
-          # - unless we're sideloading it, then we just need to copy its hash (and the tools to validate it)
           (lib.mkIf cfg.sideloadClosure [
             squashedClosure.hash
             (lib.getExe' pkgs.coreutils "sha256sum")
-          ])
-
-          #Set the timezone if configured
-          (lib.mkIf (config.time.timeZone != null) [
-            {
-              source = "${pkgs.tzdata}/share/zoneinfo/${config.time.timeZone}";
-              target = "/etc/localtime";
-            }
           ])
         ];
 
@@ -224,10 +224,21 @@ in {
             fi
           '';
 
-          # - configure the embedded QT backend
-          environment = {
+          environment = let
+            xkb = config.services.xserver.xkb;
+          in {
+            # - configure the embedded QT backend
             QT_QPA_PLATFORM = "linuxfb";
             QT_QPA_FB_DRM = "1";
+
+            # - configure the locale
+            LC_ALL = cfg.locale;
+
+            # - configure the keyboard layout
+            XKB_DEFAULT_MODEL = xkb.model;
+            XKB_DEFAULT_LAYOUT = xkb.layout;
+            XKB_DEFAULT_OPTIONS = xkb.options;
+            XKB_DEFAULT_VARIANT = xkb.variant;
           };
         };
 
@@ -239,6 +250,9 @@ in {
             value.group = "nogroup";
           })
           cfg.users);
+
+        #Set the timezone (if configured)
+        contents."/etc/localtime".source = lib.mkIf (config.time.timeZone != null) "${pkgs.tzdata}/share/zoneinfo/${config.time.timeZone}";
       };
 
       #We need to enable support for some things we need to have early in initrd

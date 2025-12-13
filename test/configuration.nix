@@ -33,12 +33,15 @@
       systemd-boot.enable = true;
     };
 
+    #Setup localization to ensure it works in the initrd
+    i18n.defaultLocale = "de_AT.UTF-8";
     time.timeZone = "Europe/Vienna";
+    services.xserver.xkb.layout = "at";
 
     #Setup the testing user
     users.users.tester = {
       isNormalUser = true;
-      password = "testing";
+      password = "xyz";
       extraGroups = ["wheel"];
     };
     users.users.root.password = "testing";
