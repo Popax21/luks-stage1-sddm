@@ -71,7 +71,7 @@ in {
     };
   };
 
-  imports = [./squashed-closure.nix];
+  imports = [./squashed-closure.nix ./sddm-handoff.nix];
 
   config = lib.mkIf cfg.enable {
     boot.initrd = {
@@ -83,13 +83,18 @@ in {
         services.luks-sddm = {
           description = "SDDM Graphical LUKS Unlock";
 
-          after = ["systemd-sysctl.service" "systemd-udevd.service" "localfs.target"];
+          after = ["systemd-sysctl.service" "systemd-udevd.service"];
           before = ["cryptsetup-pre.target" "systemd-ask-password-console.service"];
           wantedBy = ["cryptsetup.target"];
           unitConfig.DefaultDependencies = false;
 
           serviceConfig.Type = "notify";
           serviceConfig.ExecStart = "${lib.getExe' cfg.package "luks-stage1-sddm-daemon"} ${lib.escapeShellArg (toString sddmConfig)}";
+          serviceConfig.KillMode = "mixed"; # - send SIGTERM only to the main process; required for a clean shutdown
+
+          # - only attempt to start once (cryptsetup.target may have multiple start jobs queued)
+          unitConfig.StartLimitBurst = 1;
+          unitConfig.StartLimitIntervalSec = "infinity";
 
           # - if we fail, refresh the system's fbcon
           postStop = ''
@@ -115,6 +120,19 @@ in {
             XKB_DEFAULT_OPTIONS = xkb.options;
             XKB_DEFAULT_VARIANT = xkb.variant;
           };
+        };
+
+        # - send a signal to the daemon once /sysroot was mounted so it may pivot
+        services.luks-sddm-capture-sysroot = {
+          description = "SDDM Graphical LUKS Unlock - /sysroot capture";
+
+          after = ["luks-sddm.service" "sysroot.mount"];
+          bindsTo = ["luks-sddm.service"];
+          wantedBy = ["luks-sddm.service"];
+          unitConfig.DefaultDependencies = false;
+
+          serviceConfig.Type = "oneshot";
+          script = "systemctl kill --signal=SIGUSR1 --kill-whom=main luks-sddm.service";
         };
 
         #Setup users we should be able to log in as

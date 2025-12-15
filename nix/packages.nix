@@ -26,6 +26,8 @@ pkgs.lib.makeScope pkgs.newScope (self: {
 
         EXE_SDDM_GREETER = lib.getExe' sddm-minimal "sddm-greeter-qt6";
 
+        TRANSIENT_SDDM_CONF = "/run/sddm-initrd-lucks-unlock.conf";
+
         meta.mainProgram = "luks-stage1-sddm-daemon";
       }
   ) {};

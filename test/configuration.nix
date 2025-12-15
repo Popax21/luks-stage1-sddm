@@ -68,7 +68,10 @@
           '';
           path = [pkgs.coreutils-full pkgs.util-linux pkgs.cryptsetup];
         };
-        targets.cryptsetup.requiredBy = ["sysinit.target"];
+        targets.cryptsetup = {
+          before = ["sysroot.mount"];
+          requiredBy = ["sysroot.mount"];
+        };
       };
       kernelModules = ["loop"];
 

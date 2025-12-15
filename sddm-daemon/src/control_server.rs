@@ -1,4 +1,11 @@
-use std::{io::ErrorKind, mem::MaybeUninit, ops::DerefMut, path::PathBuf, str, sync::Arc};
+use std::{
+    io::ErrorKind,
+    mem::MaybeUninit,
+    ops::DerefMut,
+    path::{Path, PathBuf},
+    str,
+    sync::Arc,
+};
 
 use anyhow::{Result, bail, ensure};
 use smol::{
@@ -15,6 +22,7 @@ pub trait GreeterController: Send + Sync + 'static {
         &self,
         user: &str,
         password: Zeroizing<Box<str>>,
+        session: &Path,
         msg_sender: impl FnMut(&str) + Send + Sync,
     ) -> impl Future<Output = bool> + Send;
 
@@ -93,10 +101,11 @@ async fn greeter_control_connection(
                     let user = recv_string(&mut conn).await?;
                     let password = Zeroizing::new(recv_string(&mut conn).await?);
 
-                    //Read the session the user selected, tho we ignore this info
+                    //Read the session the user selected
                     let mut _ses_type = [0u8; 4];
                     conn.read_exact(&mut _ses_type).await?;
-                    let _ses_filename = recv_string(&mut conn).await?;
+
+                    let session = recv_string(&mut conn).await?;
 
                     //Forward the request to the controller
                     if !login_task.as_ref().is_none_or(smol::Task::is_finished) {
@@ -110,8 +119,14 @@ async fn greeter_control_connection(
                     let err_tx = err_tx.clone();
                     let controller = controller.clone();
                     login_task = Some(exec.spawn(async move {
-                        if let Err(err) =
-                            handle_login_request(conn, &user, password, &*controller).await
+                        if let Err(err) = handle_login_request(
+                            conn,
+                            &user,
+                            password,
+                            Path::new(&*session),
+                            &*controller,
+                        )
+                        .await
                         {
                             _ = err_tx.try_send(err);
                         }
@@ -146,6 +161,7 @@ async fn handle_login_request(
     stream: impl AsyncWrite + Send + Sync + Unpin,
     user: &str,
     password: Zeroizing<Box<str>>,
+    session: &Path,
     controller: &impl GreeterController,
 ) -> Result<()> {
     let stream = smol::lock::Mutex::new(stream);
@@ -172,7 +188,7 @@ async fn handle_login_request(
             };
 
             //Invoke the controller
-            let login_ok = controller.login(user, password, msg_sender).await;
+            let login_ok = controller.login(user, password, session, msg_sender).await;
 
             println!(
                 "finished handling login request for user {user:?}, result: {}",
