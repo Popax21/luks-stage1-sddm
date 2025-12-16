@@ -89,7 +89,7 @@ in {
           unitConfig.DefaultDependencies = false;
 
           serviceConfig.Type = "notify";
-          serviceConfig.ExecStart = "${lib.getExe' cfg.package "luks-stage1-sddm-daemon"} ${lib.escapeShellArg (toString sddmConfig)}";
+          serviceConfig.ExecStart = "${lib.getExe' cfg.package.nopam "luks-stage1-sddm-daemon"} ${lib.escapeShellArg (toString sddmConfig)}";
           serviceConfig.KillMode = "mixed"; # - send SIGTERM only to the main process; required for a clean shutdown
 
           # - only attempt to start once (cryptsetup.target may have multiple start jobs queued)
@@ -157,7 +157,7 @@ in {
       availableKernelModules = ["evdev" "overlay"]; # - required for input / etc.
 
       #Configure the closure of things that are compressed / optionally sideloaded (handled in ./squashed-closure.nix)
-      luks.sddmUnlock.closureContents = [cfg.package sddmConfig];
+      luks.sddmUnlock.closureContents = [cfg.package.nopam sddmConfig];
 
       #Configure infinite retries for all devices we should unlock
       luks.devices = lib.genAttrs cfg.luksDevices (_: {crypttabExtraOpts = ["tries=0"];});

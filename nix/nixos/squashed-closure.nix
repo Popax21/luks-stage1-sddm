@@ -45,7 +45,7 @@
       "!${matchPkg "glibc"}/lib/locale/C.utf8/" # - required for UTF-8 locale support
 
       # - include the binaries we actually use
-      "!${lib.getExe' cfg.package "luks-stage1-sddm-daemon"}"
+      "!${matchPkg "luks-stage1-sddm"}/bin/luks-stage1-sddm-daemon"
       "!${matchPkg "sddm-minimal"}/bin/sddm-greeter-qt6"
     ];
   } "python3 ${./build-closure.py}";

@@ -38,11 +38,17 @@
     time.timeZone = "Europe/Vienna";
     services.xserver.xkb.layout = "at";
 
-    #Setup the testing user
-    users.users.tester = {
-      isNormalUser = true;
-      password = "xyz";
-      extraGroups = ["wheel"];
+    #Setup testing users
+    users.users = {
+      tester = {
+        isNormalUser = true;
+        password = "xyz";
+        extraGroups = ["wheel"];
+      };
+      tester2 = {
+        isNormalUser = true;
+        password = "xyz2";
+      };
     };
     users.users.root.password = "testing";
 
@@ -60,10 +66,17 @@
           serviceConfig.Type = "oneshot";
           serviceConfig.RemainAfterExit = true;
 
-          script = ''
+          script = let
+            users = config.users.users;
+          in ''
             truncate -s 100M /tmp/test-drive
-            echo -ne ${lib.escapeShellArg config.users.users.tester.password} \
+
+            printf '%s' ${lib.escapeShellArg users.tester.password} \
               | cryptsetup luksFormat --batch-mode --force-password --type luks2 /tmp/test-drive -
+
+            printf '%s\n' ${lib.escapeShellArgs [users.tester.password users.tester2.password users.tester2.password]} \
+              | cryptsetup luksAddKey --batch-mode --force-password /tmp/test-drive
+
             losetup /dev/loop7 /tmp/test-drive
           '';
           path = [pkgs.coreutils-full pkgs.util-linux pkgs.cryptsetup];
@@ -121,7 +134,7 @@
     #Enable luks-stage1-sddm
     boot.initrd.luks.sddmUnlock = {
       enable = true;
-      users = ["tester"];
+      users = ["tester" "tester2"];
       luksDevices = ["test-drive"];
       sideloadClosure = false; # true; # - expensive to test!
     };

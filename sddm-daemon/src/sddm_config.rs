@@ -51,6 +51,33 @@ pub fn write_transient_sddm_config(request: &LoginRequest) -> Result<()> {
         return Ok(());
     };
 
+    //Save the password into the user / root keyring
+    use linux_keyutils::{KeyPermissionsBuilder, KeyRing, KeyRingIdentifier, Permission};
+
+    let pw_key = KeyRing::from_special_id(KeyRingIdentifier::Process, true)
+        .expect("failed to open process keyring")
+        .add_key("luks-initrd-sddm-unlock-pw", request.password.as_bytes())
+        .expect("failed to add password to login root keyring");
+
+    let perms = KeyPermissionsBuilder::builder()
+        .posessor(Permission::ALL)
+        .user(Permission::VIEW | Permission::READ | Permission::SETATTR)
+        .build();
+
+    pw_key
+        .set_perms(perms)
+        .expect("failed to set password key perms");
+
+    pw_key
+        .set_timeout(60)
+        .expect("failed to set password key timeout");
+
+    KeyRing::from_special_id(KeyRingIdentifier::User, true)
+        .expect("failed to open root keyring")
+        .link_key(pw_key)
+        .expect("failed to link password key into root keyring");
+
+    //Write the config file
     let session = request
         .session
         .file_name()
@@ -60,7 +87,8 @@ pub fn write_transient_sddm_config(request: &LoginRequest) -> Result<()> {
     let mut file = std::fs::File::create_new(file)?;
     writeln!(file, "[Autologin]")?;
     writeln!(file, "User={}", request.user)?;
-    writeln!(file, "Session={session}",)?;
+    writeln!(file, "PasswordKey={}", pw_key.get_id().0)?;
+    writeln!(file, "Session={session}")?;
 
     Ok(())
 }

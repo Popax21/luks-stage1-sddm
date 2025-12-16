@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["sddm-daemon"]
+members = ["pam-module", "sddm-daemon"]
 
 [workspace.metadata.crane]
 name = "luks-stage1-sddm"

@@ -17,18 +17,32 @@ pkgs.lib.makeScope pkgs.newScope (self: {
       lib,
       craneLib,
       cargoArtifacts,
+      runCommandLocal,
       sddm-minimal,
-    }:
-      craneLib.buildPackage {
+      pam,
+    }: let
+      pkg = craneLib.buildPackage {
         src = craneLib.cleanCargoSource ./..;
         strictDeps = true;
         inherit cargoArtifacts;
 
-        EXE_SDDM_GREETER = lib.getExe' sddm-minimal "sddm-greeter-qt6";
+        RUSTFLAGS = "-C link-args=-L${pam}/lib";
 
+        EXE_SDDM_GREETER = lib.getExe' sddm-minimal "sddm-greeter-qt6";
         TRANSIENT_SDDM_CONF = "/run/sddm-initrd-lucks-unlock.conf";
 
         meta.mainProgram = "luks-stage1-sddm-daemon";
-      }
+
+        passthru.nopam =
+          runCommandLocal "${pkg.name}-nopam" {
+            disallowedReferences = [pam];
+          } ''
+            cp -R ${pkg} $out
+            chmod -R u+w $out
+            rm -rf $out/lib
+          '';
+      };
+    in
+      pkg
   ) {};
 })

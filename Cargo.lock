@@ -489,6 +489,45 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a82ae493e598baaea5209805c49bbf2ea7de956d50d7da0da1164f9c6d28543"
 
 [[package]]
+name = "libpam-sys"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "114545207fdd55a59a967d9d974960007fce62f6f075f2414bea2589091253f6"
+dependencies = [
+ "libc",
+ "libpam-sys-helpers",
+ "libpam-sys-impls",
+]
+
+[[package]]
+name = "libpam-sys-helpers"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8790428ad4abc1112412a63c780337b5cd050fc90d497bdea96e8e2e029323a9"
+dependencies = [
+ "libpam-sys-impls",
+]
+
+[[package]]
+name = "libpam-sys-impls"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa3007a9936a126c31a182569b6e9a6203f0ac79313a42c136a2421685fd81cb"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "linux-keyutils"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "761e49ec5fd8a5a463f9b84e877c373d888935b71c6be78f3767fe2ae6bed18e"
+dependencies = [
+ "bitflags",
+ "libc",
+]
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -503,12 +542,23 @@ dependencies = [
  "evdev",
  "gethostname",
  "inotify",
+ "linux-keyutils",
  "nix 0.30.1",
  "rust-ini",
  "sd-notify",
  "serde",
  "smol",
  "zbus",
+ "zeroize",
+]
+
+[[package]]
+name = "luks-stage1-sddm-pam-handoff"
+version = "0.1.0"
+dependencies = [
+ "linux-keyutils",
+ "nonstick",
+ "rust-ini",
  "zeroize",
 ]
 
@@ -550,6 +600,19 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "memoffset",
+]
+
+[[package]]
+name = "nonstick"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53b9c180cfd5955c50b64bc2022b418e1392b798cfd3173605fb70ab22e9e4ea"
+dependencies = [
+ "bitflags",
+ "libc",
+ "libpam-sys",
+ "libpam-sys-helpers",
+ "libpam-sys-impls",
 ]
 
 [[package]]
@@ -656,13 +719,12 @@ checksum = "dc33ff2d4973d518d823d61aa239014831e521c75da58e3df4840d3f47749d09"
 
 [[package]]
 name = "rust-ini"
-version = "0.21.1"
+version = "0.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e310ef0e1b6eeb79169a1171daf9abcb87a2e17c03bee2c4bb100b55c75409f"
+checksum = "796e8d2b6696392a43bea58116b667fb4c29727dc5abd27d6acf338bb4f688c7"
 dependencies = [
  "cfg-if",
  "ordered-multimap",
- "trim-in-place",
 ]
 
 [[package]]
@@ -871,12 +933,6 @@ checksum = "b9d12581f227e93f094d3af2ae690a574abb8a2b9b7a96e7cfe9647b2b617678"
 dependencies = [
  "once_cell",
 ]
-
-[[package]]
-name = "trim-in-place"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "343e926fc669bc8cde4fa3129ab681c63671bae288b1f1081ceee6d9d37904fc"
 
 [[package]]
 name = "uds_windows"
@@ -1234,9 +1290,9 @@ dependencies = [
 
 [[package]]
 name = "zeroize"
-version = "1.8.1"
+version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ced3678a2879b30306d323f4542626697a464a97c0a07c9aebf7ebca65cd4dde"
+checksum = "b97154e67e32c85465826e8bcc1c59429aaaf107c1e4a9e53c8d8ccd5eff88d0"
 
 [[package]]
 name = "zvariant"

@@ -1,0 +1,13 @@
+[package]
+name = "luks-stage1-sddm-pam-handoff"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+linux-keyutils = "0.2.4"
+nonstick = "0.1.1"
+rust-ini = "0.21.3"
+zeroize = { version = "1.8.2", features = ["std"] }

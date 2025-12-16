@@ -35,5 +35,12 @@ in {
       #   (we can't use `conflicts = [...];` since that would queue the stop job right away)
       display-manager.preStart = "systemctl stop luks-sddm.service";
     };
+
+    #Configure a PAM module to properly perform the handoff
+    security.pam.services.sddm-autologin.text = lib.mkBefore ''
+      auth [success=ignore ignore=2 default=bad] ${cfg.package}/lib/libluks_stage1_sddm_pam_handoff.so
+      auth include sddm
+      auth [default=done] pam_permit.so
+    '';
   };
 }
