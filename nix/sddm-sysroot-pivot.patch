@@ -1,0 +1,27 @@
+diff --git a/src/greeter/GreeterApp.cpp b/src/greeter/GreeterApp.cpp
+index be4f9f0..7eac80e 100644
+--- a/src/greeter/GreeterApp.cpp
++++ b/src/greeter/GreeterApp.cpp
+@@ -45,6 +45,8 @@
+ #include <QVersionNumber>
+ #include <QSurfaceFormat>
+ 
++#include <unistd.h>
++#include <signal.h>
+ #include <iostream>
+ 
+ #define TR(x) QT_TRANSLATE_NOOP("Command line parser", QStringLiteral(x))
+@@ -369,6 +371,13 @@ int main(int argc, char **argv)
+         QCoreApplication::instance()->exit(-1);
+     });
+ 
++    s.addCustomSignal(SIGUSR1);
++    QObject::connect(&s, &SDDM::SignalHandler::customSignalReceived, &app, [](int sig) {
++        qInfo("Pivoting into /sysroot");
++        chdir("/sysroot");
++        chroot(".");
++    });
++
+     QCommandLineParser parser;
+     parser.setApplicationDescription(TR("SDDM greeter"));
+     parser.addHelpOption();

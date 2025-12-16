@@ -55,6 +55,8 @@ in
       pname = "sddm-minimal";
       outputs = ["out"];
 
+      patches = attrs.patches ++ [./sddm-sysroot-pivot.patch];
+
       buildInputs = with qt6Min; [qtbase qtdeclarative];
 
       cmakeFlags =

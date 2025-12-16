@@ -124,15 +124,15 @@ in {
 
         # - send a signal to the daemon once /sysroot was mounted so it may pivot
         services.luks-sddm-capture-sysroot = {
-          description = "SDDM Graphical LUKS Unlock - /sysroot capture";
+          description = "SDDM Graphical LUKS Unlock - /sysroot pivot";
 
-          after = ["luks-sddm.service" "sysroot.mount"];
+          after = ["luks-sddm.service" "initrd-nixos-activation.service"];
           bindsTo = ["luks-sddm.service"];
-          wantedBy = ["luks-sddm.service"];
+          wantedBy = ["initrd-switch-root.target"];
           unitConfig.DefaultDependencies = false;
 
           serviceConfig.Type = "oneshot";
-          script = "systemctl kill --signal=SIGUSR1 --kill-whom=main luks-sddm.service";
+          script = "systemctl kill --signal=SIGUSR1 luks-sddm.service";
         };
 
         #Setup users we should be able to log in as
