@@ -12,7 +12,7 @@ in {
   config = lib.mkIf (cfg.enable && sddmEnable') {
     #Create a symlink in /etc/sddm.conf.d which points to our ephemerally generated SDDM config file
     environment.etc."sddm.conf.d/initrd-luks-unlock.conf".source = toString (
-      pkgs.runCommandLocal "sddm-initrd-luks-unlock-link" {} "ln -s ${cfg.package.TRANSIENT_SDDM_CONF} $out"
+      pkgs.runCommandLocal "sddm-initrd-luks-unlock-link" {} "ln -s ${cfg.packages.luks-stage1-sddm.TRANSIENT_SDDM_CONF} $out"
     );
 
     #Leave the stage1 greeter running until the proper SDDM service has started
@@ -38,7 +38,7 @@ in {
 
     #Configure a PAM module to properly perform the handoff
     security.pam.services.sddm-autologin.text = lib.mkBefore ''
-      auth [success=ignore ignore=2 default=bad] ${cfg.package}/lib/libluks_stage1_sddm_pam_handoff.so
+      auth [success=ignore ignore=2 default=bad] ${cfg.packages.luks-stage1-sddm}/lib/libluks_stage1_sddm_pam_handoff.so
       auth include sddm
       auth [default=done] pam_permit.so
     '';

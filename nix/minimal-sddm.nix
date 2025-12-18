@@ -1,55 +1,10 @@
 {
   lib,
-  qt6,
-  qtbase-minimal,
+  qt6-minimal,
   kdePackages,
-}: let
-  qt6Min = qt6.overrideScope (final: prev: {
-    qtbase = qtbase-minimal;
-
-    qttools = prev.qttools.overrideAttrs {
-      # - we only need the linguist feature
-      cmakeFlags =
-        (map (f: "-DFEATURE_${f}=off") [
-          "assistant"
-          "clang"
-          "qdoc"
-          "designer"
-          "distancefieldgenerator"
-          "kmap2qmap"
-          "pixeltool"
-          "qev"
-          "qtattributionsscanner"
-          "qtdiag"
-          "qtplugininfo"
-          "fullqthelp"
-        ])
-        ++ ["-DFEATURE_linguist=on"];
-    };
-
-    qtdeclarative = prev.qtdeclarative.overrideAttrs (attrs: {
-      enableParallelBuilding = true;
-
-      # - we only need base QtQml / QtQuick
-      cmakeFlags =
-        attrs.cmakeFlags
-        ++ (map (f: "-DFEATURE_${f}=off") [
-          "qml_network"
-          "qml_debug"
-          "quick_designer"
-          "quick_shadereffect"
-          "quickshapes_designhelpers"
-          "quickcontrols2_basic"
-          "quicktemplates2_hover"
-          "quicktemplates2_multitouch"
-          "quicktemplates2_calendar"
-          # "quicktemplates2_container" # - can't be disabled because of a Qt debug :/
-        ]);
-    });
-  });
-in
+}:
   (kdePackages.sddm.unwrapped.override {
-    inherit (qt6Min) qtbase qttools qtdeclarative;
+    inherit (qt6-minimal) qtbase qttools qtdeclarative;
   }).overrideAttrs (
     attrs: {
       pname = "sddm-minimal";
@@ -57,7 +12,7 @@ in
 
       patches = attrs.patches ++ [./sddm-sysroot-pivot.patch];
 
-      buildInputs = with qt6Min; [qtbase qtdeclarative];
+      buildInputs = with qt6-minimal; [qtbase qtdeclarative];
 
       cmakeFlags =
         attrs.cmakeFlags
@@ -83,6 +38,9 @@ in
 
         #Load the config file from an env variable
         sed -i '/files << m_path;/a files << qEnvironmentVariable("SDDM_CONFIG");' src/common/ConfigReader.cpp
+
+        #Always log to stderr
+        sed -i 's/isatty(STDERR_FILENO)/true/' src/common/MessageHandler.h
 
         #Remove the keyboard layout switching code
         sed -i '/include "XcbKeyboardBackend.h"/i #include "KeyboardBackend.h"' src/greeter/KeyboardModel.cpp

@@ -137,6 +137,9 @@
       users = ["tester" "tester2"];
       luksDevices = ["test-drive"];
       sideloadClosure = false; # true; # - expensive to test!
+
+      theme.name = "breeze";
+      theme.packages = [pkgs.kdePackages.plasma-desktop];
     };
 
     boot.initrd.systemd.services.luks-sddm.environment.RUST_BACKTRACE = "1";

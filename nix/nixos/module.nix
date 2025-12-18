@@ -9,9 +9,12 @@
 
   defaultConfig =
     {
-      Theme.Current = cfg.theme;
       LUKSUnlock.Devices = map (name: config.boot.initrd.luks.devices.${name}.device) cfg.luksDevices;
     }
+    // (lib.optionalAttrs (cfg.theme.name != "") {
+      Theme.Current = cfg.theme.name;
+      Theme.ThemeDir = "${cfg.theme.themeEnv}/share/sddm/themes";
+    })
     // (let
       stubbedSessions =
         pkgs.runCommandLocal "desktops-stubbed" {
@@ -33,9 +36,17 @@
   iniFmt = pkgs.formats.ini {listsAsDuplicateKeys = true;};
   sddmConfig = iniFmt.generate "initrd-sddm.conf" (lib.recursiveUpdate defaultConfig cfg.settings);
 in {
+  imports = [./squashed-closure.nix ./sddm-handoff.nix ./theming.nix];
+
   options.boot.initrd.luks.sddmUnlock = {
     enable = lib.mkEnableOption "LUKS unlock using SDDM in initrd";
-    package = lib.mkPackageOption pkgs.luks-stage1-sddm "luks-stage1-sddm" {pkgsText = "pkgs.luks-stage1-sddm";};
+
+    packages = lib.mkOption {
+      type = lib.types.attrs;
+      description = "The luks-stage1-sddm package scope to use";
+      default = pkgs.luks-stage1-sddm;
+      defaultText = lib.literalExpression "pkgs.luks-stage1-sddm";
+    };
 
     users = lib.mkOption {
       type = lib.types.listOf lib.types.str;
@@ -48,13 +59,6 @@ in {
         The name of LUKS devices that will be unlocked using SDDM.
         There must be a corresponding entry in `boot.initrd.luks.devices` for each listed device.
       '';
-    };
-
-    theme = lib.mkOption {
-      type = lib.types.str;
-      description = "Greeter theme to use.";
-      default = config.services.displayManager.sddm.theme;
-      defaultText = lib.literalExpression "config.services.displayManager.sddm.theme";
     };
 
     locale = lib.mkOption {
@@ -70,8 +74,6 @@ in {
       default = {};
     };
   };
-
-  imports = [./squashed-closure.nix ./sddm-handoff.nix];
 
   config = lib.mkIf cfg.enable {
     boot.initrd = {
@@ -89,7 +91,7 @@ in {
           unitConfig.DefaultDependencies = false;
 
           serviceConfig.Type = "notify";
-          serviceConfig.ExecStart = "${lib.getExe' cfg.package.nopam "luks-stage1-sddm-daemon"} ${lib.escapeShellArg (toString sddmConfig)}";
+          serviceConfig.ExecStart = "${lib.getExe cfg.packages.sddm-daemon} ${lib.escapeShellArg (toString sddmConfig)}";
           serviceConfig.KillMode = "mixed"; # - send SIGTERM only to the main process; required for a clean shutdown
 
           # - only attempt to start once (cryptsetup.target may have multiple start jobs queued)
@@ -157,7 +159,7 @@ in {
       availableKernelModules = ["evdev" "overlay"]; # - required for input / etc.
 
       #Configure the closure of things that are compressed / optionally sideloaded (handled in ./squashed-closure.nix)
-      luks.sddmUnlock.closureContents = [cfg.package.nopam sddmConfig];
+      luks.sddmUnlock.closureContents = [cfg.packages.sddm-daemon sddmConfig];
 
       #Configure infinite retries for all devices we should unlock
       luks.devices = lib.genAttrs cfg.luksDevices (_: {crypttabExtraOpts = ["tries=0"];});

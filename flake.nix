@@ -21,9 +21,11 @@
         crane = crane.mkLib;
       };
     in rec {
-      packages = rec {
-        inherit (flakePkgs) qtbase-minimal sddm-minimal luks-stage1-sddm;
-        default = luks-stage1-sddm;
+      packages = flake-utils.lib.flattenTree {
+        inherit (flakePkgs) sddm-minimal luks-stage1-sddm sddm-daemon;
+        qt6-minimal = nixpkgs.lib.recurseIntoAttrs {
+          inherit (flakePkgs.qt6-minimal) qtbase qtdeclarative qttools qt5compat;
+        };
       };
 
       checks =

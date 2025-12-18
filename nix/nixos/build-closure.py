@@ -29,7 +29,7 @@ class ExcludePattern:
         return self.verdict if self.pattern.match(str(path)) else None
 
 
-exclude_patterns = list(map(ExcludePattern, attrs["excludePatterns"]))
+exclude_patterns = [ExcludePattern(p) for p in attrs["excludePatterns"] if len(p) > 0]
 
 
 def should_exclude(path: pathlib.Path):

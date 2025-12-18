@@ -9,7 +9,7 @@ pkgs.lib.makeScope pkgs.newScope (self: {
     strictDeps = true;
   };
 
-  qtbase-minimal = self.callPackage ./minimal-qtbase.nix {};
+  qt6-minimal = self.callPackage ./minimal-qt6.nix {};
   sddm-minimal = self.callPackage ./minimal-sddm.nix {};
 
   luks-stage1-sddm = self.callPackage (
@@ -17,7 +17,6 @@ pkgs.lib.makeScope pkgs.newScope (self: {
       lib,
       craneLib,
       cargoArtifacts,
-      runCommandLocal,
       sddm-minimal,
       pam,
     }: let
@@ -30,19 +29,24 @@ pkgs.lib.makeScope pkgs.newScope (self: {
 
         EXE_SDDM_GREETER = lib.getExe' sddm-minimal "sddm-greeter-qt6";
         TRANSIENT_SDDM_CONF = "/run/sddm-initrd-lucks-unlock.conf";
-
-        meta.mainProgram = "luks-stage1-sddm-daemon";
-
-        passthru.nopam =
-          runCommandLocal "${pkg.name}-nopam" {
-            disallowedReferences = [pam];
-          } ''
-            cp -R ${pkg} $out
-            chmod -R u+w $out
-            rm -rf $out/lib
-          '';
       };
     in
       pkg
+  ) {};
+
+  sddm-daemon = self.callPackage (
+    {
+      runCommandLocal,
+      pam,
+      luks-stage1-sddm,
+    }:
+      runCommandLocal "${luks-stage1-sddm.name}-daemon" {
+        disallowedReferences = [pam];
+        meta.mainProgram = "luks-stage1-sddm-daemon";
+      } ''
+        cp -R ${luks-stage1-sddm} $out
+        chmod -R u+w $out
+        rm -rf $out/lib
+      ''
   ) {};
 })

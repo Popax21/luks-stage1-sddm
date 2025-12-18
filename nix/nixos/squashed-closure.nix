@@ -17,7 +17,7 @@
     nativeBuildInputs = with pkgs; [python3 squashfsTools];
 
     excludePatterns = let
-      matchPkg = name: "${builtins.storeDir}/[a-z0-9]+-${name}-[^/]+";
+      matchPkg = name: "${builtins.storeDir}/[a-z0-9]+-${name}(?:-[^/]+)?";
       matchAllPkgs = "${builtins.storeDir}/[^/]+";
     in [
       # - only include /lib / /share
@@ -36,6 +36,10 @@
       "!${matchPkg "gcc"}/lib/libgcc_s.so(.[^/]+)?"
       "!${matchPkg "gcc"}/lib/libstdc\\+\\+.so(.[^/]+)?"
       "!${matchPkg "gcc"}/lib/libgomp.so(.[^/]+)?"
+
+      # - exclude all SDDM themes except the one we use
+      "${matchAllPkgs}/share/sddm/themes/"
+      (lib.optionalString (cfg.theme.name != "") "!${matchPkg "initrd-sddm-theme-env"}/share/sddm/themes/${cfg.theme.name}/")
 
       # - bunch of package-specific fixups
       "${matchPkg "hwdata"}/" # - we don't need hwdata

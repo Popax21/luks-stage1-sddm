@@ -15,5 +15,9 @@ in {
   type = "app";
   program = "${vm}/bin/run-nixos-vm";
   meta.description = "Development VM";
-  passthru = {inherit vm;};
+  passthru = rec {
+    inherit config;
+    sddmClosure = config.config.boot.initrd.luks.sddmUnlock.closureContents;
+    sddmConf = nixpkgs.lib.findFirst (p: p.name == "initrd-sddm.conf") null sddmClosure;
+  };
 }
