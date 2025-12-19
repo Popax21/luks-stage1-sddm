@@ -31,7 +31,7 @@
       default = {};
       example = ''
         {
-          "org.kde.ksvg" = pkgs.luks-stag1-sddm.qt6-minimal.replaceQtPkgs pkgs.kdePackages.ksvg;
+          "org.kde.ksvg" = pkgs.luks-stag1-sddm.kde-minimal.ksvg;
         }
       '';
     };
@@ -55,7 +55,9 @@
 
   config = let
     cfg = config.boot.initrd.luks.sddmUnlock;
+
     qt6-minimal = cfg.packages.qt6-minimal;
+    qtPkgs = [qt6-minimal.qtdeclarative qt6-minimal.qtsvg] ++ (lib.optional cfg.theme.qt5Compat qt6-minimal.qt5compat);
   in {
     #Build a theme environment containing the SDDM theme and all its referenced Qt QML modules
     boot.initrd.luks.sddmUnlock.theme.themeEnv = pkgs.runCommand "initrd-sddm-theme-env" rec {
@@ -79,15 +81,13 @@
     } "python3 ${./build-theme-env.py}";
 
     #Hook up theme Qt modules / plugins
-    boot.initrd.systemd.services.luks-sddm.environment = let
-      qtPkgs = [cfg.theme.themeEnv qt6-minimal.qtdeclarative] ++ (lib.optional cfg.theme.qt5Compat qt6-minimal.qt5compat);
-    in {
-      QT_PLUGIN_PATH = lib.makeSearchPath "lib/qt-6/plugins" qtPkgs;
-      QML_IMPORT_PATH = lib.makeSearchPath "lib/qt-6/qml" qtPkgs;
+    boot.initrd.systemd.services.luks-sddm.environment = {
+      QT_PLUGIN_PATH = lib.makeSearchPath "lib/qt-6/plugins" ([cfg.theme.themeEnv] ++ qtPkgs);
+      QML_IMPORT_PATH = lib.makeSearchPath "lib/qt-6/qml" ([cfg.theme.themeEnv] ++ qtPkgs);
     };
 
     boot.initrd.luks.sddmUnlock = {
-      closureContents = lib.mkIf cfg.theme.qt5Compat [qt6-minimal.qt5compat];
+      closureContents = qtPkgs;
       closureBuildDeps = [cfg.theme.themeEnv.raw] ++ (lib.attrValues cfg.theme.qmlModules);
     };
   };

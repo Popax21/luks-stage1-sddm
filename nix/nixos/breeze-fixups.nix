@@ -20,6 +20,7 @@ in {
       "org.kde.config" = kconfig;
       "org.kde.ksvg" = ksvg;
       "org.kde.kirigami" = kirigami;
+      "org.kde.plasma.core" = libplasma;
     };
 
     fixups = let
@@ -62,10 +63,6 @@ in {
         #Stub out the capslock indicator since it requires libplasma
         #TODO: maybe recompile just that part of libplasma?
         (stubType "org.kde.plasma.private.keyboardindicator" null "KeyState" "import QtQml\nQtObject { property var key; }")
-
-        #Stub out some final (unused) libplasma usages
-        (stubType "org.kde.plasma.core" null "Window" "import QtQml\nQtObject {}")
-        (stubType "org.kde.plasma.core" null "Theme" "import QtQml\nQtObject {}")
       ];
   };
 }

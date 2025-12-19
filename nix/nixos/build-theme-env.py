@@ -179,8 +179,13 @@ class QmlModule:
                     if m:
                         self._imported_mods.append(m)
 
+        # check for a `force-plugin` file
+        if (path / "force-plugin").is_file():
+            assert has_plugin
+            self.include_plugin = True
+
         # warn if we have a plugin but no .qmltypes file (which we need to discover exported plugin types)
-        if has_plugin and not has_plugin_typeinfo:
+        if has_plugin and not (has_plugin_typeinfo or self.include_plugin):
             print(
                 f"WARN: QML module {name} has a native Qt plugin but no typeinfo file; unable to assess plugin usage"
             )

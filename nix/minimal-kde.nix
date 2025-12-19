@@ -1,5 +1,8 @@
 {
   lib,
+  stdenv,
+  cmake,
+  ninja,
   kdePackages,
   qt6-minimal,
   ...
@@ -22,6 +25,20 @@ in
     });
     kirigami = prev.kirigami.overrideAttrs (old: {
       cmakeFlags = (old.cmakeFlags or []) ++ ["-DUSE_DBUS=OFF"];
-      patches = (old.patches or []) ++ [./kirigami-no-http-icons.patch];
+      patches = (old.patches or []) ++ [patches/kirigami-no-http-icons.patch];
     });
+
+    # - we don't want anything of libplasma except for a HEAVILY stripped down corebindingsplugin to initialize KI18n
+    libplasma = stdenv.mkDerivation {
+      pname = "libplasma-stub";
+      inherit (prev.libplasma) version;
+
+      src = patches/libplasma-stub;
+
+      buildInputs = [qt6-minimal.qtdeclarative final.ki18n final.extra-cmake-modules];
+      nativeBuildInputs = [cmake ninja];
+
+      cmakeFlags = ["-DQT_MAJOR_VERSION=6"];
+      dontWrapQtApps = true;
+    };
   })

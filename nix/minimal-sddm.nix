@@ -10,7 +10,7 @@
       pname = "sddm-minimal";
       outputs = ["out"];
 
-      patches = attrs.patches ++ [./sddm-sysroot-pivot.patch];
+      patches = attrs.patches ++ [patches/sddm-sysroot-pivot.patch];
 
       buildInputs = with qt6-minimal; [qtbase qtdeclarative];
 

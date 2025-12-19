@@ -107,7 +107,7 @@
       contents."/etc/systemd/journald.conf".source = config.environment.etc."systemd/journald.conf".source;
     };
 
-    # boot.kernelParams = ["rd.systemd.unit=rescue.target"]; # - use this to drop a shell in the stage 1 initrd
+    boot.kernelParams = ["rd.systemd.unit=rescue.target"]; # - use this to drop a shell in the stage 1 initrd
 
     #Enable a minimal stub DM + DE
     services.displayManager = {
