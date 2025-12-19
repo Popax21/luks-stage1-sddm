@@ -10,6 +10,7 @@ pkgs.lib.makeScope pkgs.newScope (self: {
   };
 
   qt6-minimal = self.callPackage ./minimal-qt6.nix {};
+  kde-minimal = self.callPackage ./minimal-kde.nix {};
   sddm-minimal = self.callPackage ./minimal-sddm.nix {};
 
   luks-stage1-sddm = self.callPackage (

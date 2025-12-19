@@ -12,6 +12,7 @@ with open(os.environ["NIX_ATTRS_JSON_FILE"], "r") as q:
 
 out = Path(os.environ["out"])
 raw_env = Path(attrs["rawEnv"])
+qml_modules = attrs["qmlModules"]
 fixups = attrs["fixups"]
 
 
@@ -83,11 +84,13 @@ MISSING_QT_PLUGINS: list[tuple[QmlModule, str]] = []
 
 
 class QmlModule:
-    MODULES: dict[str, QmlModule] = dict()
-    MODULE_NAMES: list[str] = list()
+    MODULES: dict[str, QmlModule | None] = dict()
+    COPIED_MODULES: list[str] = list()
 
     @staticmethod
-    def import_module(name: str) -> QmlModule | None:
+    def import_module(
+        name: str, for_module: QmlModule | None = None
+    ) -> QmlModule | None:
         if name in QmlModule.MODULES:
             return QmlModule.MODULES[name]
 
@@ -95,35 +98,55 @@ class QmlModule:
         if name.startswith("Qt"):
             return None
 
-        # check if the QML module dir exists and has a 'qmldir' file
-        path = raw_env.joinpath(
-            "lib",
-            "qt-6",
-            "qml",
-            *name.split("."),
-        )
+        subdir = Path("lib", "qt-6", "qml", *name.split("."))
 
+        # apply user module substitutions
+        if name in qml_modules:
+            assert not (out / subdir).exists()
+
+            env = Path(qml_modules[name])
+            path = env / subdir
+            plugin_ok = True
+
+            if not (path.is_dir() and (path / "qmldir").is_file()):
+                print()
+                print(
+                    f"Substitute package {qml_modules[name]} for QML module {name} does not contain said module"
+                )
+                exit(1)
+
+            print(f"Substituting QML module {name} from package {qml_modules[name]}")
+        else:
+            env = raw_env if for_module is None else for_module.env
+            path = env / subdir
+            plugin_ok = for_module is not None and for_module.plugin_ok
+
+        # check if the QML module dir exists and has a 'qmldir' file
         if path.is_dir() and (path / "qmldir").is_file():
-            m = QmlModule(name, path)
+            m = QmlModule(name, path, env, plugin_ok)
             QmlModule.MODULES[name] = m
-            QmlModule.MODULE_NAMES.append(name)
+            QmlModule.COPIED_MODULES.append(name)
             return m
         else:
             return None
 
     name: str
     path: Path
+    env: Path
     include_plugin: bool
+    plugin_ok: bool
 
     _incl_types: dict[str, list[str]]
     _qml_types: dict[str, Path]
     _plugin_types: set[str]
     _imported_mods: list[QmlModule]
 
-    def __init__(self, name: str, path: Path):
+    def __init__(self, name: str, path: Path, env: Path, plugin_ok: bool):
         self.name = name
         self.path = path
+        self.env = env
         self.include_plugin = False
+        self.plugin_ok = plugin_ok
 
         self._incl_types = dict()
         self._qml_types = dict()
@@ -152,7 +175,7 @@ class QmlModule:
                     self._parse_typeinfo(path / a[1])
                 elif a[0] == "import":
                     # - top-level module import
-                    m = QmlModule.import_module(a[1])
+                    m = QmlModule.import_module(a[1], for_module=self)
                     if m:
                         self._imported_mods.append(m)
 
@@ -261,11 +284,16 @@ class QmlModule:
         if not self.include_plugin:
             return None
 
-        # TODO: allow for plugin substitution
+        plugin_so = f"lib{plugin}.so"
 
-        # the plugin is needed, but we don't have a substitute suitable for initrd conditions
+        if self.plugin_ok:
+            print(f"Including native Qt plugin {plugin_so} for QML module {self.name}")
+            include_path(self.path / plugin_so)
+            return f"plugin {plugin}"
+
+        # the plugin is needed, but it's not suitable for initrd conditions
         global MISSING_QT_PLUGINS
-        MISSING_QT_PLUGINS.append((self, f"lib{plugin}.so"))
+        MISSING_QT_PLUGINS.append((self, plugin_so))
 
         return None
 
@@ -314,7 +342,7 @@ def process_qml_file(
         if not a or a[0] != "import":
             continue
 
-        m = QmlModule.import_module(a[1])
+        m = QmlModule.import_module(a[1], for_module=module)
         if m is not None:
             mods.append(m)
 
@@ -354,8 +382,10 @@ if (raw_env / "share" / "locale").exists():
 
 # fixup QML modules
 i = 0
-while i < len(QmlModule.MODULE_NAMES):
-    QmlModule.MODULES[QmlModule.MODULE_NAMES[i]].fixup()
+while i < len(QmlModule.COPIED_MODULES):
+    m = QmlModule.MODULES[QmlModule.COPIED_MODULES[i]]
+    assert m is not None
+    m.fixup()
     i += 1
 
 # if we are missing any native Qt plugins then error out
@@ -389,7 +419,7 @@ print(
     "Built theme environment in %s containing %d QML modules (%d native plugins)"
     % (
         out,
-        sum(1 for m in QmlModule.MODULES.values() if m.is_used),
-        sum(1 for m in QmlModule.MODULES.values() if m.include_plugin),
+        sum(1 for m in QmlModule.MODULES.values() if m and m.is_used),
+        sum(1 for m in QmlModule.MODULES.values() if m and m.include_plugin),
     )
 )

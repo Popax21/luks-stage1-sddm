@@ -1,4 +1,5 @@
 {
+  lib,
   stdenv,
   cmake,
   ninja,
@@ -151,4 +152,41 @@ qt6.overrideScope (final: prev: {
         # "quicktemplates2_container" # - can't be disabled because of a Qt bug :/
       ]);
   });
+
+  replaceQtPkgs = pkg: recDeps: let
+    recDeps' =
+      if lib.isFunction recDeps
+      then recDeps
+      else (p: lib.any (d: d == p || (p.name or p.pname) == d) recDeps);
+
+    replacePkgDeps = pkg:
+      if lib.isDerivation pkg
+      then
+        pkg.overrideAttrs (old: {
+          buildInputs = map replaceDep (old.buildInputs or []);
+          propagatedBuildInputs = map replaceDep (old.propagatedBuildInputs or []);
+
+          nativeBuildInputs = map replaceNativeDep (old.nativeBuildInputs or []);
+          propagatedNativeBuildInputs = map replaceNativeDep (old.propagatedNativeBuildInputs or []);
+        })
+      else pkg;
+
+    replaceDep = dep:
+      if lib.isDerivation dep
+      then
+        final.${
+          dep.pname or dep.name
+        } or (
+          if recDeps' dep
+          then replacePkgDeps dep
+          else dep
+        )
+      else dep;
+
+    replaceNativeDep = dep:
+      if lib.isDerivation dep && dep.name == "wrap-qt6-apps-hook"
+      then final.wrapQtAppsHook
+      else replaceDep dep;
+  in
+    replacePkgDeps pkg;
 })

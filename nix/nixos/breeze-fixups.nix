@@ -4,17 +4,27 @@
   pkgs,
   ...
 }: let
-  tcfg = config.boot.initrd.luks.sddmUnlock.theme;
+  cfg = config.boot.initrd.luks.sddmUnlock;
 in {
   options.boot.initrd.luks.sddmUnlock.theme.breezeFixups = lib.mkOption {
     type = lib.types.bool;
     description = "Whether to apply theme fixups intended to get KDE Plasma's Breeze theme working.";
-    default = tcfg.name == "breeze";
+    default = cfg.theme.name == "breeze";
     defaultText = lib.literalExpression ''config.boot.initrd.luks.sddmUnlock.theme.name == "breeze"'';
   };
 
-  config.boot.initrd.luks.sddmUnlock.theme = {
+  config.boot.initrd.luks.sddmUnlock.theme = lib.mkIf cfg.theme.breezeFixups {
     qt5Compat = true;
+
+    qmlModules = let
+      inherit (cfg.packages) qt6-minimal kde-minimal;
+      inherit (qt6-minimal) replaceQtPkgs;
+      isKdePkg = d: builtins.hasAttr (d.pname or d.name) kde-minimal;
+    in {
+      "org.kde.ksvg" = replaceQtPkgs kde-minimal.ksvg isKdePkg;
+      "org.kde.kirigami" = replaceQtPkgs kde-minimal.kirigami isKdePkg;
+    };
+
     fixups = let
       toFsPath = path:
         if lib.hasInfix ":" path
@@ -33,11 +43,7 @@ in {
       in
         fixup "${module}/qmldir" "echo ${lib.escapeShellArg qmldirEntry} >> $target";
     in
-      lib.mkIf tcfg.breezeFixups (lib.mkMerge [
-        #Stub out minor libkirigami features
-        (stubType "org.kde.kirigami" "2.20" "MnemonicData" "")
-        (stubType "org.kde.kirigami.private" "2.20" "ActionHelper" "")
-
+      lib.mkMerge [
         #Stub out `KAuthorized` (pulls in the config machinery & is unused)
         (stubType "org.kde.config" null "KAuthorized" "function authorize(arg) { return true; }")
 
@@ -60,20 +66,9 @@ in {
         (fixup "org.kde.breeze.components:Battery" "truncate -s0 $target")
 
         #FIXME: crude patches to remove all remaining plugin uses
-        (stubType "org.kde.kirigami.platform" "2.20" "Units" "import QtQml\nQtObject {}")
-        (stubType "org.kde.kirigami.platform" "2.20" "Theme" "import QtQml\nQtObject {}")
-        (stubType "org.kde.kirigami.platform" "2.20" "Settings" "import QtQml\nQtObject {}")
-        (stubType "org.kde.kirigami.primitives" "2.20" "Icon" "import QtQml\nQtObject {}")
-        (stubType "org.kde.kirigami.layouts" "2.20" "Padding" "import QtQml\nQtObject {}")
-
-        (stubType "org.kde.ksvg" null "Svg" "import QtQml\nQtObject {}")
-        (stubType "org.kde.ksvg" null "SvgItem" "import QtQml\nQtObject {}")
-        (stubType "org.kde.ksvg" null "FrameSvgItem" "import QtQml\nQtObject {}")
-        (stubType "org.kde.ksvg" null "ImageSet" "import QtQml\nQtObject {}")
-
         (stubType "org.kde.plasma.core" null "Window" "import QtQml\nQtObject {}")
         (stubType "org.kde.plasma.core" null "Theme" "import QtQml\nQtObject {}")
         (stubType "org.kde.plasma.private.keyboardindicator" null "KeyState" "import QtQml\nQtObject {}")
-      ]);
+      ];
   };
 }

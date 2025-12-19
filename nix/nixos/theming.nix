@@ -19,6 +19,22 @@
       default = config.services.displayManager.sddm.extraPackages;
       defaultText = lib.literalExpression "config.services.displayManager.sddm.extraPackages";
     };
+
+    qt5Compat = lib.mkOption {
+      type = lib.types.bool;
+      description = "Whether to enable support for the `Qt5Compat` QML modules within the SDDM theme environment.";
+      default = false;
+    };
+    qmlModules = lib.mkOption {
+      type = lib.types.attrsOf lib.types.package;
+      description = "A set of initrd-suitable QML modules which are used to replace existing ones in the SDDM theme environment.";
+      default = {};
+      example = ''
+        {
+          "org.kde.ksvg" = pkgs.luks-stag1-sddm.qt6-minimal.replaceQtPkgs pkgs.kdePackages.ksvg;
+        }
+      '';
+    };
     fixups = lib.mkOption {
       type = lib.types.attrsOf lib.types.lines;
       description = "A set of commands which are used to fix up files in the SDDM theme environment.";
@@ -29,11 +45,6 @@
           "some/directory/" = "echo 'hi' >> $target";
         }
       '';
-    };
-    qt5Compat = lib.mkOption {
-      type = lib.types.bool;
-      description = "Whether to enable support for the `Qt5Compat` QML modules within the SDDM theme environment.";
-      default = false;
     };
 
     themeEnv = lib.mkOption {
@@ -62,7 +73,8 @@
           "/share/sddm/themes/${cfg.theme.name}"
         ];
       };
-      fixups = cfg.theme.fixups;
+
+      inherit (cfg.theme) qmlModules fixups;
     } "python3 ${./build-theme-env.py}";
 
     #Hook up theme Qt modules / plugins

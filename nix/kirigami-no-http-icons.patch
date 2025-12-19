@@ -1,0 +1,131 @@
+diff --git a/src/primitives/icon.cpp b/src/primitives/icon.cpp
+index 6fd04787..94a41c3f 100644
+--- a/src/primitives/icon.cpp
++++ b/src/primitives/icon.cpp
+@@ -16,7 +16,6 @@
+ #include <QDebug>
+ #include <QGuiApplication>
+ #include <QIcon>
+-#include <QNetworkReply>
+ #include <QPainter>
+ #include <QPropertyAnimation>
+ #include <QQuickImageProvider>
+@@ -84,10 +83,6 @@ void Icon::setSource(const QVariant &icon)
+         connect(m_theme, &Kirigami::Platform::PlatformTheme::colorsChanged, this, &QQuickItem::polish);
+     }
+ 
+-    if (m_networkReply) {
+-        // if there was a network query going on, interrupt it
+-        m_networkReply->close();
+-    }
+     m_loadedImage = QImage();
+     setStatus(Loading);
+ 
+@@ -251,53 +246,6 @@ void Icon::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry)
+     }
+ }
+ 
+-void Icon::handleRedirect(QNetworkReply *reply)
+-{
+-    QNetworkAccessManager *qnam = reply->manager();
+-    if (reply->error() != QNetworkReply::NoError) {
+-        return;
+-    }
+-    const QUrl possibleRedirectUrl = reply->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl();
+-    if (!possibleRedirectUrl.isEmpty()) {
+-        const QUrl redirectUrl = reply->url().resolved(possibleRedirectUrl);
+-        if (redirectUrl == reply->url()) {
+-            // no infinite redirections thank you very much
+-            reply->deleteLater();
+-            return;
+-        }
+-        reply->deleteLater();
+-        QNetworkRequest request(possibleRedirectUrl);
+-        request.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::PreferCache);
+-        m_networkReply = qnam->get(request);
+-        connect(m_networkReply.data(), &QNetworkReply::finished, this, [this]() {
+-            handleFinished(m_networkReply);
+-        });
+-    }
+-}
+-
+-void Icon::handleFinished(QNetworkReply *reply)
+-{
+-    if (!reply) {
+-        return;
+-    }
+-
+-    reply->deleteLater();
+-    if (!reply->attribute(QNetworkRequest::RedirectionTargetAttribute).isNull()) {
+-        handleRedirect(reply);
+-        return;
+-    }
+-
+-    m_loadedImage = QImage();
+-
+-    const QString filename = reply->url().fileName();
+-    if (!m_loadedImage.load(reply, filename.mid(filename.indexOf(QLatin1Char('.'))).toLatin1().constData())) {
+-        // broken image from data, inform the user of this with some useful broken-image thing...
+-        m_loadedImage = iconPixmap(QIcon::fromTheme(m_fallback));
+-    }
+-
+-    polish();
+-}
+-
+ void Icon::updatePolish()
+ {
+     QQuickItem::updatePolish();
+@@ -457,24 +405,6 @@ QImage Icon::findIcon(const QSize &size)
+             setStatus(Error);
+             break;
+         }
+-    } else if (iconSource.startsWith(QLatin1String("http://")) || iconSource.startsWith(QLatin1String("https://"))) {
+-        if (!m_loadedImage.isNull()) {
+-            setStatus(Ready);
+-            return m_loadedImage.scaled(size, Qt::KeepAspectRatio, smooth() ? Qt::SmoothTransformation : Qt::FastTransformation);
+-        }
+-        const auto url = m_source.toUrl();
+-        QQmlEngine *engine = qmlEngine(this);
+-        QNetworkAccessManager *qnam;
+-        if (engine && (qnam = engine->networkAccessManager()) && (!m_networkReply || m_networkReply->url() != url)) {
+-            QNetworkRequest request(url);
+-            request.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::PreferCache);
+-            m_networkReply = qnam->get(request);
+-            connect(m_networkReply.data(), &QNetworkReply::finished, this, [this]() {
+-                handleFinished(m_networkReply);
+-            });
+-        }
+-        // Temporary icon while we wait for the real image to load...
+-        img = iconPixmap(QIcon::fromTheme(m_placeholder));
+     } else {
+         if (iconSource.startsWith(QLatin1String("qrc:/"))) {
+             iconSource = iconSource.mid(3);
+diff --git a/src/primitives/icon.h b/src/primitives/icon.h
+index d94ea30f..ca03a5f5 100644
+--- a/src/primitives/icon.h
++++ b/src/primitives/icon.h
+@@ -15,7 +15,6 @@
+ 
+ #include <QQmlEngine>
+ 
+-class QNetworkReply;
+ class QQuickWindow;
+ class QPropertyAnimation;
+ 
+@@ -291,8 +290,6 @@ Q_SIGNALS:
+ protected:
+     void geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry) override;
+     QImage findIcon(const QSize &size);
+-    void handleFinished(QNetworkReply *reply);
+-    void handleRedirect(QNetworkReply *reply);
+     bool guessMonochrome(const QImage &img);
+     void setStatus(Status status);
+     void updatePolish() override;
+@@ -313,7 +310,6 @@ private:
+ 
+     Kirigami::Platform::PlatformTheme *m_theme = nullptr;
+     Kirigami::Platform::Units *m_units = nullptr;
+-    QPointer<QNetworkReply> m_networkReply;
+     QHash<int, bool> m_monochromeHeuristics;
+     QVariant m_source;
+     qreal m_devicePixelRatio = 1.0;
