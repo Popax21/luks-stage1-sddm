@@ -36,6 +36,13 @@
 
   iniFmt = pkgs.formats.ini {listsAsDuplicateKeys = true;};
   sddmConfig = iniFmt.generate "initrd-sddm.conf" (lib.recursiveUpdate defaultConfig cfg.settings);
+
+  glibcLocales = pkgs.glibcLocales.override {
+    locales = [
+      "C.UTF-8/UTF-8"
+      cfg.locale
+    ];
+  };
 in {
   imports = [./squashed-closure.nix ./sddm-handoff.nix ./theming.nix];
 
@@ -117,6 +124,7 @@ in {
 
             # - configure the locale
             LC_ALL = cfg.locale;
+            LOCALE_ARCHIVE = "${glibcLocales}/lib/locale/locale-archive";
 
             # - configure the keyboard layout
             XKB_DEFAULT_MODEL = xkb.model;
@@ -161,7 +169,7 @@ in {
       availableKernelModules = ["evdev" "overlay"]; # - required for input / etc.
 
       #Configure the closure of things that are compressed / optionally sideloaded (handled in ./squashed-closure.nix)
-      luks.sddmUnlock.closureContents = [cfg.packages.sddm-daemon sddmConfig];
+      luks.sddmUnlock.closureContents = [glibcLocales cfg.packages.sddm-daemon sddmConfig];
 
       #Configure infinite retries for all devices we should unlock
       luks.devices = lib.genAttrs cfg.luksDevices (_: {crypttabExtraOpts = ["tries=0"];});

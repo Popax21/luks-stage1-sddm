@@ -90,6 +90,9 @@
         pathsToLink =
           [
             "/lib/qt-6"
+            "/share/locale/${lib.head (lib.splitString "_" cfg.locale)}"
+            "/share/locale/${lib.head (lib.splitString "." cfg.locale)}"
+            "/share/locale/${cfg.locale}"
             "/share/sddm/themes/${cfg.theme.name}"
           ]
           ++ (map (i: "/share/icons/${i}") cfg.theme.iconSets);

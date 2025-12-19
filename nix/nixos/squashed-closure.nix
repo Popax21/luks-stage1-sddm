@@ -37,6 +37,12 @@
       "!${matchPkg "gcc"}/lib/libstdc\\+\\+.so(.[^/]+)?"
       "!${matchPkg "gcc"}/lib/libgomp.so(.[^/]+)?"
 
+      # - include locale data for our chosen locale
+      "!${matchPkg "glibc"}/lib/locale/" # - locale archive data
+      "!${matchAllPkgs}/share/locale/${lib.head (lib.splitString "_" cfg.locale)}/"
+      "!${matchAllPkgs}/share/locale/${lib.head (lib.splitString "." cfg.locale)}/"
+      "!${matchAllPkgs}/share/locale/${cfg.locale}/"
+
       # - exclude all SDDM themes except the one we use
       "${matchAllPkgs}/share/sddm/themes/"
       (lib.optionalString (cfg.theme.name != "") "!${matchPkg "initrd-sddm-theme-env"}/share/sddm/themes/${cfg.theme.name}/")
@@ -46,7 +52,6 @@
       "${matchPkg "glib"}/lib/(?!libglib-2.0.so)[^/]+" # - we only need libglib-2.0.so
       "${matchPkg "systemd-minimal-libs"}/lib/(?!libudev.so)[^/]+" # - we only need udev
       "!${matchPkg "xkeyboard-config"}/etc" # - is a symlink
-      "!${matchPkg "glibc"}/lib/locale/C.utf8/" # - required for UTF-8 locale support
 
       # - include the binaries we actually use
       "!${matchPkg "luks-stage1-sddm"}/bin/luks-stage1-sddm-daemon"
