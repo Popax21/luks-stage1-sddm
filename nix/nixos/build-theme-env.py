@@ -76,7 +76,7 @@ def include_path(path: Path) -> Path:
 
 
 QML_COMMENT_REGEX = re.compile("//.*$")
-QML_MULTICOMMENT_REGEX = re.compile("/\\*.*\\*/", re.DOTALL)
+QML_MULTICOMMENT_REGEX = re.compile("/\\*.*?\\*/", re.DOTALL)
 QML_TYPE_REGEX = re.compile("[A-Z][a-zA-Z0-9_]+")
 QMLTYPES_EXPORT_REGEX = re.compile('"([a-zA-Z0-9.]+)/([A-Z][a-zA-Z0-9_]+) [^ ]+"')
 
@@ -190,6 +190,9 @@ class QmlModule:
     @property
     def is_used(self) -> bool:
         return self.include_plugin or len(self._incl_types) > 0
+
+    def __repr__(self) -> str:
+        return f"QmlModule({self.name})"
 
     def _parse_typeinfo(self, path: Path):
         # discover exported plugin types

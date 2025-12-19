@@ -57,12 +57,15 @@ in {
         (sedFixup "org.kde.breeze.components:VirtualKeyboardLoader" ["s/VirtualKeyboard_wayland.qml/VirtualKeyboard.qml/"])
 
         #The battery indicator doesn't work (depends on org.kde.Solid) and pulls in the entirety of plasma-workspace
-        (fixup "org.kde.breeze.components:Battery" "truncate -s0 $target")
+        (fixup "org.kde.breeze.components:Battery" "echo -ne 'import QtQuick\\nItem {}' > $target")
 
-        #FIXME: crude patches to remove all remaining plugin uses
+        #Stub out the capslock indicator since it requires libplasma
+        #TODO: maybe recompile just that part of libplasma?
+        (stubType "org.kde.plasma.private.keyboardindicator" null "KeyState" "import QtQml\nQtObject { property var key; }")
+
+        #Stub out some final (unused) libplasma usages
         (stubType "org.kde.plasma.core" null "Window" "import QtQml\nQtObject {}")
         (stubType "org.kde.plasma.core" null "Theme" "import QtQml\nQtObject {}")
-        (stubType "org.kde.plasma.private.keyboardindicator" null "KeyState" "import QtQml\nQtObject {}")
       ];
   };
 }
