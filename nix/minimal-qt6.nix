@@ -26,7 +26,7 @@ qt6.overrideScope (final: prev: {
   qtbase = stdenv.mkDerivation rec {
     pname = "qtbase-minimal";
     inherit (qt6.srcs.qtbase) version src;
-    inherit (qt6.qtbase) patches;
+    patches = qt6.qtbase.patches ++ [patches/qtbase-linuxfb-platform-theme.patch];
 
     strictDeps = true;
     enableParallelBuilding = true;

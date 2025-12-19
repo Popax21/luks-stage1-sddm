@@ -17,6 +17,8 @@ fixups = attrs["fixups"]
 
 
 def map_to_out_path(path: Path) -> Path:
+    assert path.is_absolute(), path
+
     if path.is_relative_to(out) or len(path.parts) == len(out.parts):
         return path
 
@@ -58,19 +60,19 @@ def apply_fixups(path: Path):
 
 def include_path(path: Path) -> Path:
     out_path = map_to_out_path(path)
-    if not out_path.exists():
-        if path.is_symlink():
-            p = include_path(path.readlink())
-            if not out_path.exists():
-                out_path.symlink_to(p)
-        elif path.is_dir():
-            for f in path.iterdir():
-                include_path(f)
-        elif path.is_file(follow_symlinks=False):
+    if path.is_symlink():
+        p = include_path((path.parent / path.readlink()).resolve())
+        if not out_path.exists():
+            out_path.symlink_to(p)
+    elif path.is_dir():
+        for f in path.iterdir():
+            include_path(f)
+    elif path.is_file(follow_symlinks=False):
+        if not out_path.exists():
             shutil.copyfile(path, out_path)
             apply_fixups(path)
-        else:
-            assert False
+    else:
+        assert False
 
     return out_path
 
@@ -384,9 +386,12 @@ for f in raw_env.glob("share/sddm/themes/**/*", recurse_symlinks=True):
     else:
         include_path(f)
 
-# copy over all locale data
+# copy over locale / icon data
 if (raw_env / "share" / "locale").exists():
     include_path(raw_env / "share" / "locale")
+
+if (raw_env / "share" / "icons").exists():
+    include_path(raw_env / "share" / "icons")
 
 # fixup QML modules
 i = 0

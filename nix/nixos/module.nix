@@ -112,6 +112,7 @@ in {
           in {
             # - configure the embedded QT backend
             QT_QPA_PLATFORM = "linuxfb";
+            QT_QPA_PLATFORMTHEME = "generic";
             QT_QPA_FB_DRM = "1";
 
             # - configure the locale

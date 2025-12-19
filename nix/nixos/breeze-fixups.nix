@@ -14,6 +14,7 @@ in {
   };
 
   config.boot.initrd.luks.sddmUnlock.theme = lib.mkIf cfg.theme.breezeFixups {
+    #Setup Qt fixups
     qt5Compat = true;
 
     qmlModules = with cfg.packages.kde-minimal; {
@@ -64,5 +65,9 @@ in {
         #TODO: maybe recompile just that part of libplasma?
         (stubType "org.kde.plasma.private.keyboardindicator" null "KeyState" "import QtQml\nQtObject { property var key; }")
       ];
+
+    #Setup the breeze icon theme
+    packages = [pkgs.kdePackages.breeze-icons];
+    iconSets = lib.mkBefore ["breeze"];
   };
 }

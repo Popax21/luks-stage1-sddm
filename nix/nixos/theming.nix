@@ -20,6 +20,23 @@
       defaultText = lib.literalExpression "config.services.displayManager.sddm.extraPackages";
     };
 
+    iconSets = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      description = "The icon sets to expose to the SDDM greeter process. The first element of the list is set as the default Qt icon theme.";
+      default = ["hicolor"];
+    };
+
+    envVars = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      description = "Environment variables to set for the SDDM greeter process.";
+      default = {};
+      example = ''
+        {
+          QT_QPA_SYSTEM_ICON_THEME = "breeze";
+        }
+      '';
+    };
+
     qt5Compat = lib.mkOption {
       type = lib.types.bool;
       description = "Whether to enable support for the `Qt5Compat` QML modules within the SDDM theme environment.";
@@ -70,10 +87,12 @@
         paths = cfg.theme.packages;
         includeClosures = true;
 
-        pathsToLink = [
-          "/lib/qt-6"
-          "/share/sddm/themes/${cfg.theme.name}"
-        ];
+        pathsToLink =
+          [
+            "/lib/qt-6"
+            "/share/sddm/themes/${cfg.theme.name}"
+          ]
+          ++ (map (i: "/share/icons/${i}") cfg.theme.iconSets);
       };
       passthru.raw = rawEnv;
 
@@ -81,10 +100,16 @@
     } "python3 ${./build-theme-env.py}";
 
     #Hook up theme Qt modules / plugins
-    boot.initrd.systemd.services.luks-sddm.environment = {
-      QT_PLUGIN_PATH = lib.makeSearchPath "lib/qt-6/plugins" ([cfg.theme.themeEnv] ++ qtPkgs);
-      QML_IMPORT_PATH = lib.makeSearchPath "lib/qt-6/qml" ([cfg.theme.themeEnv] ++ qtPkgs);
-    };
+    boot.initrd.systemd.services.luks-sddm.environment =
+      cfg.theme.envVars
+      // {
+        XDG_DATA_DIRS = lib.makeSearchPath "share" ([cfg.theme.themeEnv] ++ qtPkgs);
+
+        QT_PLUGIN_PATH = lib.makeSearchPath "lib/qt-6/plugins" ([cfg.theme.themeEnv] ++ qtPkgs);
+        QML_IMPORT_PATH = lib.makeSearchPath "lib/qt-6/qml" ([cfg.theme.themeEnv] ++ qtPkgs);
+
+        QT_QPA_SYSTEM_ICON_THEME = lib.head cfg.theme.iconSets;
+      };
 
     boot.initrd.luks.sddmUnlock = {
       closureContents = qtPkgs;
