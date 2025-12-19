@@ -48,7 +48,16 @@
           clippy
           rust-analyzer
         ];
-        propagatedBuildInputs = [flakePkgs.cargoArtifacts flakePkgs.sddm-minimal]; # - keep our cargo artifacts / custom SDDM alive as part of the direnv GC root
+
+        # - keep our cargo artifacts / custom Qt6 + SDDM alive as part of the direnv GC root
+        propagatedBuildInputs = with flakePkgs; [
+          cargoArtifacts
+          qt6-minimal.qtbase
+          qt6-minimal.qtdeclarative
+          qt6-minimal.qttools
+          qt6-minimal.qt5compat
+          sddm-minimal
+        ];
       };
 
       apps.devVM = import test/dev_vm.nix {inherit self nixpkgs system;};

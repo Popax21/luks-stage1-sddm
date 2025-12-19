@@ -9,6 +9,7 @@
 
   defaultConfig =
     {
+      LUKSUnlock.Greeter = lib.getExe' cfg.packages.sddm-minimal "sddm-greeter-qt6";
       LUKSUnlock.Devices = map (name: config.boot.initrd.luks.devices.${name}.device) cfg.luksDevices;
     }
     // (lib.optionalAttrs (cfg.theme.name != "") {

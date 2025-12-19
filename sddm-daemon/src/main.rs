@@ -102,9 +102,7 @@ fn main() -> ExitCode {
 
         //Start the SDDM greeter
         let mut greeter = {
-            let mut cmd =
-                Command::new(option_env!("EXE_SDDM_GREETER").unwrap_or("sddm-greeter-qt6"));
-
+            let mut cmd = Command::new(&controller.sddm_config.greeter);
             let cmd = cmd
                 .arg("--socket")
                 .arg(&socket_path)

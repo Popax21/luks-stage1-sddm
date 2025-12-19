@@ -5,6 +5,7 @@ use anyhow::{Context, Result};
 use crate::login_controller::LoginRequest;
 
 pub struct SddmConfig {
+    pub greeter: PathBuf,
     pub theme: Option<PathBuf>,
     pub luks_devices: Vec<PathBuf>,
 }
@@ -30,14 +31,19 @@ impl SddmConfig {
             None
         };
 
-        let luks_devices = ini
+        let luks_unlock = ini
             .section(Some("LUKSUnlock"))
-            .context("no LUKSUnlock section")?
-            .get_all("Devices")
-            .map(PathBuf::from)
-            .collect();
+            .context("no LUKSUnlock section")?;
+
+        let greeter = luks_unlock
+            .get("Greeter")
+            .context("no Greeter config value")?;
+        let greeter = PathBuf::from(greeter);
+
+        let luks_devices = luks_unlock.get_all("Devices").map(PathBuf::from).collect();
 
         Ok(SddmConfig {
+            greeter,
             theme,
             luks_devices,
         })

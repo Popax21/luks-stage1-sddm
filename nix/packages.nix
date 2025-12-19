@@ -14,10 +14,8 @@ pkgs.lib.makeScope pkgs.newScope (self: {
 
   luks-stage1-sddm = self.callPackage (
     {
-      lib,
       craneLib,
       cargoArtifacts,
-      sddm-minimal,
       pam,
     }: let
       pkg = craneLib.buildPackage {
@@ -26,8 +24,6 @@ pkgs.lib.makeScope pkgs.newScope (self: {
         inherit cargoArtifacts;
 
         RUSTFLAGS = "-C link-args=-L${pam}/lib";
-
-        EXE_SDDM_GREETER = lib.getExe' sddm-minimal "sddm-greeter-qt6";
         TRANSIENT_SDDM_CONF = "/run/sddm-initrd-lucks-unlock.conf";
       };
     in
