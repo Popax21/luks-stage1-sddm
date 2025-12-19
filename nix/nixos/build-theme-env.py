@@ -58,8 +58,16 @@ def apply_fixups(path: Path):
             subprocess.check_call(fx, shell=True, env=env)
 
 
+INCLUDED_PATHS = set()
+
+
 def include_path(path: Path) -> Path:
     out_path = map_to_out_path(path)
+
+    if path in INCLUDED_PATHS:
+        return out_path
+    INCLUDED_PATHS.add(path)
+
     if path.is_symlink():
         p = include_path((path.parent / path.readlink()).resolve())
         if not out_path.exists():
@@ -135,8 +143,8 @@ class QmlModule:
     name: str
     path: Path
     env: Path
-    include_plugin: bool
     plugin_ok: bool
+    include_plugin: bool
 
     _incl_types: dict[str, list[str]]
     _qml_types: dict[str, Path]
@@ -147,8 +155,8 @@ class QmlModule:
         self.name = name
         self.path = path
         self.env = env
-        self.include_plugin = False
         self.plugin_ok = plugin_ok
+        self.include_plugin = False
 
         self._incl_types = dict()
         self._qml_types = dict()
@@ -171,6 +179,8 @@ class QmlModule:
                 elif a[0] == "plugin" or (a[0] == "optional" and a[1] == "plugin"):
                     # - plugin declaration
                     has_plugin = True
+                    if a[0] != "optional":
+                        self.include_plugin = True
                 elif a[0] == "typeinfo":
                     # - plugin .qmltypes file
                     has_plugin_typeinfo = True
@@ -308,15 +318,13 @@ class QmlModule:
         return None
 
     def print_missing_plugin_error(self, plugin: str):
-        print(
-            f"ERROR: missing native Qt plugin {plugin} for QML module {self.name}, required by:"
-        )
+        print(f"ERROR: missing native Qt plugin {plugin} for QML module {self.name}")
 
         for ty in self._plugin_types:
             if not ty in self._incl_types:
                 continue
 
-            print(f" - QML type {ty}")
+            print(f" - required by QML type {ty}")
             for incl in self._incl_types[ty]:
                 print(f"   - used by {incl}")
 

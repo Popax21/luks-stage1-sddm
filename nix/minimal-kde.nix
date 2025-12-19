@@ -41,4 +41,17 @@ in
       cmakeFlags = ["-DQT_MAJOR_VERSION=6"];
       dontWrapQtApps = true;
     };
+
+    plasma-workspace = prev.plasma-workspace.overrideAttrs {
+      postPatch = "ln -sf ${patches/plasma-workspace-CMakeLists.txt} CMakeLists.txt";
+      postInstall = "";
+      postFixup = "";
+
+      buildInputs = [qt6-minimal.qtdeclarative final.extra-cmake-modules final.kguiaddons];
+      nativeBuildInputs = [cmake ninja];
+      propagatedBuildInputs = [];
+
+      outputs = ["out"];
+      dontWrapQtApps = true;
+    };
   })

@@ -14,7 +14,6 @@ in {
   };
 
   config.boot.initrd.luks.sddmUnlock.theme = lib.mkIf cfg.theme.breezeFixups {
-    #Setup Qt fixups
     qt5Compat = true;
 
     qmlModules = with cfg.packages.kde-minimal; {
@@ -22,6 +21,8 @@ in {
       "org.kde.ksvg" = ksvg;
       "org.kde.kirigami" = kirigami;
       "org.kde.plasma.core" = libplasma;
+      "org.kde.breeze.components" = plasma-workspace;
+      "org.kde.plasma.private.keyboardindicator" = plasma-workspace;
     };
 
     fixups = let
@@ -32,15 +33,6 @@ in {
 
       fixup = path: cmd: {${toFsPath path} = cmd;};
       sedFixup = path: instrs: fixup path "sed -i ${lib.escapeShellArg (lib.join ";" instrs)} $target";
-
-      stubType = module: ver: type: qml: let
-        qmldirEntry = "${type} ${
-          if ver != null
-          then ver
-          else "0.0"
-        } ${pkgs.writeText "initrd-${module}-${type}-stub.qml" qml}";
-      in
-        fixup "${module}/qmldir" "echo ${lib.escapeShellArg qmldirEntry} >> $target";
     in
       lib.mkMerge [
         #The `WallpaperFader` type has an unused import
@@ -60,10 +52,6 @@ in {
 
         #The battery indicator doesn't work (depends on org.kde.Solid) and pulls in the entirety of plasma-workspace
         (fixup "org.kde.breeze.components:Battery" "echo -ne 'import QtQuick\\nItem {}' > $target")
-
-        #Stub out the capslock indicator since it requires libplasma
-        #TODO: maybe recompile just that part of libplasma?
-        (stubType "org.kde.plasma.private.keyboardindicator" null "KeyState" "import QtQml\nQtObject { property var key; }")
       ];
 
     #Setup the breeze icon theme
