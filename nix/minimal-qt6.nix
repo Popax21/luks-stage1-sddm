@@ -153,34 +153,10 @@ qt6.overrideScope (final: prev: {
       ]);
   });
 
-  replaceQtPkgs = pkg: recDeps: let
-    recDeps' =
-      if lib.isFunction recDeps
-      then recDeps
-      else (p: lib.any (d: d == p || (p.name or p.pname) == d) recDeps);
-
-    replacePkgDeps = pkg:
-      if lib.isDerivation pkg
-      then
-        pkg.overrideAttrs (old: {
-          buildInputs = map replaceDep (old.buildInputs or []);
-          propagatedBuildInputs = map replaceDep (old.propagatedBuildInputs or []);
-
-          nativeBuildInputs = map replaceNativeDep (old.nativeBuildInputs or []);
-          propagatedNativeBuildInputs = map replaceNativeDep (old.propagatedNativeBuildInputs or []);
-        })
-      else pkg;
-
+  replaceQtPkgs = pkg: let
     replaceDep = dep:
       if lib.isDerivation dep
-      then
-        final.${
-          dep.pname or dep.name
-        } or (
-          if recDeps' dep
-          then replacePkgDeps dep
-          else dep
-        )
+      then final.${dep.pname or dep.name} or dep
       else dep;
 
     replaceNativeDep = dep:
@@ -188,5 +164,14 @@ qt6.overrideScope (final: prev: {
       then final.wrapQtAppsHook
       else replaceDep dep;
   in
-    replacePkgDeps pkg;
+    if lib.isDerivation pkg
+    then
+      pkg.overrideAttrs (old: {
+        buildInputs = map replaceDep (old.buildInputs or []);
+        propagatedBuildInputs = map replaceDep (old.propagatedBuildInputs or []);
+
+        nativeBuildInputs = map replaceNativeDep (old.nativeBuildInputs or []);
+        propagatedNativeBuildInputs = map replaceNativeDep (old.propagatedNativeBuildInputs or []);
+      })
+    else pkg;
 })

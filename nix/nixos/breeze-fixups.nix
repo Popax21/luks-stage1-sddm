@@ -16,13 +16,10 @@ in {
   config.boot.initrd.luks.sddmUnlock.theme = lib.mkIf cfg.theme.breezeFixups {
     qt5Compat = true;
 
-    qmlModules = let
-      inherit (cfg.packages) qt6-minimal kde-minimal;
-      inherit (qt6-minimal) replaceQtPkgs;
-      isKdePkg = d: builtins.hasAttr (d.pname or d.name) kde-minimal;
-    in {
-      "org.kde.ksvg" = replaceQtPkgs kde-minimal.ksvg isKdePkg;
-      "org.kde.kirigami" = replaceQtPkgs kde-minimal.kirigami isKdePkg;
+    qmlModules = with cfg.packages.kde-minimal; {
+      "org.kde.config" = kconfig;
+      "org.kde.ksvg" = ksvg;
+      "org.kde.kirigami" = kirigami;
     };
 
     fixups = let
@@ -44,9 +41,6 @@ in {
         fixup "${module}/qmldir" "echo ${lib.escapeShellArg qmldirEntry} >> $target";
     in
       lib.mkMerge [
-        #Stub out `KAuthorized` (pulls in the config machinery & is unused)
-        (stubType "org.kde.config" null "KAuthorized" "function authorize(arg) { return true; }")
-
         #The `WallpaperFader` type has an unused import
         (sedFixup "org.kde.breeze.components:WallpaperFader" ["/import org.kde.plasma.private.sessions/d"])
 

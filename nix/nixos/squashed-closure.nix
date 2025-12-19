@@ -67,6 +67,12 @@ in {
       '';
     };
 
+    rootBuildDeps = lib.mkOption {
+      type = lib.bool;
+      default = true;
+      description = "Keep the build dependencies of the SDDM initrd closure alive.";
+    };
+
     sideloadClosure = lib.mkOption {
       type = lib.types.bool;
       default = config.boot.loader.systemd-boot.enable || (config.boot.loader.grub.enable && config.boot.loader.grub.efiSupport);
@@ -78,6 +84,10 @@ in {
     };
 
     closureContents = lib.mkOption {
+      type = lib.types.listOf lib.types.package;
+      internal = true;
+    };
+    closureBuildDeps = lib.mkOption {
       type = lib.types.listOf lib.types.package;
       internal = true;
     };
@@ -174,5 +184,9 @@ in {
     nixpkgs.overlays = lib.optional (cfg.pinPkgs != null) (final: prev: {
       luks-stage1-sddm = prev.luks-stage1-sddm.overrideScope (cfg.pinPkgs final.stdenv.targetPlatform.system);
     });
+
+    #Keep the closure build dependencies alive (if enabled)
+    system.extraDependencies = cfg.closureBuildDeps;
+    boot.initrd.luks.sddmUnlock.closureBuildDeps = cfg.closureContents;
   };
 }

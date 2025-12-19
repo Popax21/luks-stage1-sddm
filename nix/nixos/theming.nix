@@ -58,7 +58,7 @@
     qt6-minimal = cfg.packages.qt6-minimal;
   in {
     #Build a theme environment containing the SDDM theme and all its referenced Qt QML modules
-    boot.initrd.luks.sddmUnlock.theme.themeEnv = pkgs.runCommand "initrd-sddm-theme-env" {
+    boot.initrd.luks.sddmUnlock.theme.themeEnv = pkgs.runCommand "initrd-sddm-theme-env" rec {
       __structuredAttrs = true;
       nativeBuildInputs = with pkgs; [python3];
 
@@ -73,6 +73,7 @@
           "/share/sddm/themes/${cfg.theme.name}"
         ];
       };
+      passthru.raw = rawEnv;
 
       inherit (cfg.theme) qmlModules fixups;
     } "python3 ${./build-theme-env.py}";
@@ -85,6 +86,9 @@
       QML_IMPORT_PATH = lib.makeSearchPath "lib/qt-6/qml" qtPkgs;
     };
 
-    boot.initrd.luks.sddmUnlock.closureContents = lib.mkIf cfg.theme.qt5Compat [qt6-minimal.qt5compat];
+    boot.initrd.luks.sddmUnlock = {
+      closureContents = lib.mkIf cfg.theme.qt5Compat [qt6-minimal.qt5compat];
+      closureBuildDeps = [cfg.theme.themeEnv.raw] ++ (lib.attrValues cfg.theme.qmlModules);
+    };
   };
 }
