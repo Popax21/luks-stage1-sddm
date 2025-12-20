@@ -16,5 +16,5 @@ ecm_add_qml_module(corebindingsplugin URI "org.kde.plasma.core" VERSION 2.0 DEPE
 target_link_libraries(corebindingsplugin PRIVATE KF6::I18n KF6I18nQml)
 target_sources(corebindingsplugin PRIVATE corebindingsplugin.cpp)
 
-ecm_target_qml_sources(corebindingsplugin SOURCES Window.qml Theme.qml force-plugin)
+ecm_target_qml_sources(corebindingsplugin SOURCES Window.qml Theme.qml)
 ecm_finalize_qml_module(corebindingsplugin DESTINATION ${KDE_INSTALL_QMLDIR})
