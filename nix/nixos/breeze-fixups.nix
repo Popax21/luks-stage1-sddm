@@ -53,9 +53,6 @@ in {
         (fixup "org.kde.breeze.components:Battery" "echo -ne 'import QtQuick\\nItem {}' > $target")
       ];
 
-    extraPaths = [
-      "/share/plasma/desktoptheme/default"
-      "/share/icons/breeze"
-    ];
+    extraPaths = ["/share/plasma/desktoptheme/default"];
   };
 }

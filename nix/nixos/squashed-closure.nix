@@ -19,44 +19,45 @@
     excludePatterns = let
       matchPkg = name: "${builtins.storeDir}/[a-z0-9]+-${name}(?:-[^/]+)?";
       matchAllPkgs = "${builtins.storeDir}/[^/]+";
-    in [
-      # - only include /lib / /share
-      "${matchAllPkgs}/"
-      "!${matchAllPkgs}/lib/[^/]+\\.so(.[^/]+)?"
-      "!${matchAllPkgs}/lib/qt-6/"
-      "!${matchAllPkgs}/share/"
-      "${matchAllPkgs}/share/doc/"
-      "${matchAllPkgs}/share/man/"
-      "${matchAllPkgs}/share/i18n/"
-      "${matchAllPkgs}/share/locale/"
-      "${matchAllPkgs}/share/pkgconfig/"
+    in
+      [
+        # - only include /lib / /share
+        "${matchAllPkgs}/"
+        "!${matchAllPkgs}/lib/[^/]+\\.so(.[^/]+)?"
+        "!${matchAllPkgs}/share/"
+        "${matchAllPkgs}/share/doc/"
+        "${matchAllPkgs}/share/man/"
+        "${matchAllPkgs}/share/i18n/"
+        "${matchAllPkgs}/share/locale/"
+        "${matchAllPkgs}/share/pkgconfig/"
 
-      # - exclude libasan / libtsan / ...
-      "${matchPkg "gcc"}/lib/"
-      "!${matchPkg "gcc"}/lib/libgcc_s.so(.[^/]+)?"
-      "!${matchPkg "gcc"}/lib/libstdc\\+\\+.so(.[^/]+)?"
-      "!${matchPkg "gcc"}/lib/libgomp.so(.[^/]+)?"
+        # - exclude libasan / libtsan / ...
+        "${matchPkg "gcc"}/lib/"
+        "!${matchPkg "gcc"}/lib/libgcc_s.so(.[^/]+)?"
+        "!${matchPkg "gcc"}/lib/libstdc\\+\\+.so(.[^/]+)?"
+        "!${matchPkg "gcc"}/lib/libgomp.so(.[^/]+)?"
 
-      # - include locale data for our chosen locale
-      "!${matchPkg "glibc"}/lib/locale/" # - locale archive data
-      "!${matchAllPkgs}/share/locale/${lib.head (lib.splitString "_" cfg.locale)}/"
-      "!${matchAllPkgs}/share/locale/${lib.head (lib.splitString "." cfg.locale)}/"
-      "!${matchAllPkgs}/share/locale/${cfg.locale}/"
+        # - only include as few Qt plugins as we can get away with (QML is fine tho)
+        "!${matchPkg "qtbase"}/lib/qt-6/plugins/"
+        "!${matchPkg "qtsvg"}/lib/qt-6/plugins/"
+        "!${matchAllPkgs}/lib/qt-6/qml/"
 
-      # - exclude all SDDM themes except the one we use
-      "${matchAllPkgs}/share/sddm/themes/"
-      (lib.optionalString (cfg.theme.name != "") "!${matchPkg "initrd-sddm-theme-env"}/share/sddm/themes/${cfg.theme.name}/")
+        # - exclude all SDDM themes except the one we use
+        "${matchAllPkgs}/share/sddm/themes/"
+        (lib.optionalString (cfg.theme.name != "") "!${matchPkg "initrd-sddm-theme-env"}/share/sddm/themes/${cfg.theme.name}/")
 
-      # - bunch of package-specific fixups
-      "${matchPkg "hwdata"}/" # - we don't need hwdata
-      "${matchPkg "glib"}/lib/(?!libglib-2.0.so)[^/]+" # - we only need libglib-2.0.so
-      "${matchPkg "systemd-minimal-libs"}/lib/(?!libudev.so)[^/]+" # - we only need udev
-      "!${matchPkg "xkeyboard-config"}/etc" # - is a symlink
+        # - bunch of package-specific fixups
+        "!${matchPkg "glibc"}/lib/locale/" # - locale archive data
+        "${matchPkg "hwdata"}/" # - we don't need hwdata
+        "${matchPkg "glib"}/lib/(?!libglib-2.0.so)[^/]+" # - we only need libglib-2.0.so
+        "${matchPkg "systemd-minimal-libs"}/lib/(?!libudev.so)[^/]+" # - we only need udev
+        "!${matchPkg "xkeyboard-config"}/etc" # - is a symlink
 
-      # - include the binaries we actually use
-      "!${matchPkg "luks-stage1-sddm"}/bin/luks-stage1-sddm-daemon"
-      "!${matchPkg "sddm-minimal"}/bin/sddm-greeter-qt6"
-    ];
+        # - include the binaries we actually use
+        "!${matchPkg "luks-stage1-sddm"}/bin/luks-stage1-sddm-daemon"
+        "!${matchPkg "sddm-minimal"}/bin/sddm-greeter-qt6"
+      ]
+      ++ cfg.theme.extraClosureRules;
   } "python3 ${./build-closure.py}";
 
   efiDir = config.boot.loader.efi.efiSysMountPoint;

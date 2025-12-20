@@ -15,10 +15,9 @@ in {
   type = "app";
   program = "${vm}/bin/run-nixos-vm";
   meta.description = "Development VM";
-  passthru = rec {
-    inherit config;
-    roots = nixpkgs.legacyPackages.${system}.runCommandLocal "luks-stage1-sddm-dev-vm-roots" {
-      propagatedBuildInputs = config.config.boot.initrd.luks.sddmUnlock.closureBuildDeps;
-    } "touch $out";
-  };
+
+  inherit config;
+  roots = nixpkgs.legacyPackages.${system}.runCommandLocal "luks-stage1-sddm-dev-vm-roots" {
+    propagatedBuildInputs = config.config.boot.initrd.luks.sddmUnlock.closureBuildDeps;
+  } "touch $out";
 }

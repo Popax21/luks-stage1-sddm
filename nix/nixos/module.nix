@@ -38,10 +38,8 @@
   sddmConfig = iniFmt.generate "initrd-sddm.conf" (lib.recursiveUpdate defaultConfig cfg.settings);
 
   glibcLocales = pkgs.glibcLocales.override {
-    locales = [
-      "C.UTF-8/UTF-8"
-      cfg.locale
-    ];
+    allLocales = false;
+    locales = ["C.UTF-8/UTF-8" "${cfg.locale}/UTF-8"];
   };
 in {
   imports = [./squashed-closure.nix ./sddm-handoff.nix ./theming.nix];
@@ -139,6 +137,7 @@ in {
           description = "SDDM Graphical LUKS Unlock - /sysroot pivot";
 
           after = ["luks-sddm.service" "initrd-nixos-activation.service"];
+          before = ["initrd-switch-root.service"];
           bindsTo = ["luks-sddm.service"];
           wantedBy = ["initrd-switch-root.target"];
           unitConfig.DefaultDependencies = false;

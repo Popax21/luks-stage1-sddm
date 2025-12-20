@@ -63,6 +63,7 @@ INCLUDED_PATHS = set()
 
 
 def include_path(path: Path) -> Path:
+    path = Path(os.path.normpath(path))
     out_path = map_to_out_path(path)
 
     if path in INCLUDED_PATHS:
@@ -70,9 +71,10 @@ def include_path(path: Path) -> Path:
     INCLUDED_PATHS.add(path)
 
     if path.is_symlink():
-        p = include_path((path.parent / path.readlink()).resolve())
+        t = path.readlink()
+        p = include_path(path.parent / t)
         if not out_path.exists():
-            out_path.symlink_to(p)
+            out_path.symlink_to(p if t.is_absolute() else t)
     elif path.is_dir():
         for f in path.iterdir():
             include_path(f)
@@ -89,6 +91,7 @@ def include_path(path: Path) -> Path:
 QML_COMMENT_REGEX = re.compile("//.*$")
 QML_MULTICOMMENT_REGEX = re.compile("/\\*.*?\\*/", re.DOTALL)
 QML_TYPE_REGEX = re.compile("[A-Z][a-zA-Z0-9_]+")
+QML_MODULE_TYPE_REGEX = re.compile("([a-zA-Z][a-zA-Z0-9_]+).([A-Z][a-zA-Z0-9_]+)")
 QMLTYPES_EXPORT_REGEX = re.compile('"([a-zA-Z0-9.]+)/([A-Z][a-zA-Z0-9_]+) [^ ]+"')
 
 MISSING_QT_PLUGINS: list[tuple[QmlModule, str]] = []
@@ -213,9 +216,9 @@ class QmlModule:
             if exp.group(1) == self.name:
                 self._plugin_types.add(exp.group(2))
 
-    def include_type(self, ty: str, includers: list[str]):
+    def include_type(self, ty: str, includers: list[str]) -> bool:
         if ty in self._incl_types:
-            return
+            return True
 
         if ty in self._qml_types:
             # QML-provided type; include the QML type in the output env
@@ -226,14 +229,21 @@ class QmlModule:
                 module=self,
                 includers=includers,
             )
+
+            return True
         elif ty in self._plugin_types:
             # plugin-provided type; include the plugin in the output env
             self._incl_types[ty] = includers
             self.include_plugin = True
+            return True
         else:
             # not provided by the module itself, tho it might be provided by an imported module
+            known_type = False
             for m in self._imported_mods:
-                m.include_type(ty, includers)
+                if m.include_type(ty, includers):
+                    known_type = True
+
+            return known_type
 
     def fixup(self):
         qmldir = map_to_out_path(self.path / "qmldir")
@@ -331,6 +341,8 @@ PROCESSED_QML_FILES: set[Path] = set()
 def process_qml_file(
     qml: Path, module: QmlModule | None = None, includers: list[str] = []
 ):
+    assert qml.is_file() and qml.is_relative_to(out)
+
     if qml in PROCESSED_QML_FILES:
         return
     PROCESSED_QML_FILES.add(qml)
@@ -346,10 +358,11 @@ def process_qml_file(
     code = QML_MULTICOMMENT_REGEX.sub("", code)
 
     # - find import statements
-    mods: list[QmlModule] = []
+    scoped_mods: dict[str, QmlModule] = {}
+    global_mods: list[QmlModule] = []
 
     if module is not None:
-        mods.append(module)
+        global_mods.append(module)
 
     for l in code.splitlines():
         a = l.strip().split()
@@ -357,13 +370,32 @@ def process_qml_file(
             continue
 
         m = QmlModule.import_module(a[1], for_module=module)
-        if m is not None:
-            mods.append(m)
+        if m is None:
+            continue
+
+        if "as" in a:
+            scoped_mods[a[a.index("as") + 1]] = m
+        else:
+            global_mods.append(m)
 
     # - find used types from said imports
-    for ty in map(lambda m: m.group(), QML_TYPE_REGEX.finditer(code)):
-        for m in mods:
-            m.include_type(ty, includers)
+    if scoped_mods:
+        for m in QML_MODULE_TYPE_REGEX.finditer(code):
+            mod, ty = m.group(1), m.group(2)
+            if mod not in scoped_mods:
+                continue
+
+            if not scoped_mods[mod].include_type(ty, includers):
+                print()
+                print(
+                    f"QML file {qml.relative_to(out)} access non-existent type {ty} from imported module {scoped_mods[mod].name}"
+                )
+                exit(1)
+
+    if global_mods:
+        for ty in map(lambda m: m.group(), QML_TYPE_REGEX.finditer(code)):
+            for m in global_mods:
+                m.include_type(ty, includers)
 
 
 def include_theme_conf(conf: Path):

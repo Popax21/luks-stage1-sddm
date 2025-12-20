@@ -38,6 +38,9 @@ in
       outputs = ["out"];
       dontWrapQtApps = true;
     });
+    breeze-icons = prev.breeze-icons.overrideAttrs (old: {
+      cmakeFlags = (old.cmakeFlags or []) ++ ["-DSKIP_INSTALL_ICONS=ON"];
+    });
 
     libplasma = prev.libplasma.overrideAttrs (old: {
       patches = (old.patches or []) ++ [patches/libplasma-minimal.patch];

@@ -58,6 +58,11 @@
         ]
       '';
     };
+    extraClosureRules = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      description = "Extra exclusion rules to apply when building the initrd closure.";
+      default = [];
+    };
 
     fixups = lib.mkOption {
       type = lib.types.attrsOf lib.types.lines;
@@ -84,33 +89,48 @@
     qtPkgs = [qt6-minimal.qtdeclarative qt6-minimal.qtsvg] ++ (lib.optional cfg.theme.qt5Compat qt6-minimal.qt5compat);
   in {
     #Build a theme environment containing the SDDM theme and all its referenced Qt QML modules
-    boot.initrd.luks.sddmUnlock.theme.themeEnv = pkgs.runCommand "initrd-sddm-theme-env" rec {
-      __structuredAttrs = true;
-      nativeBuildInputs = with pkgs; [python3];
+    boot.initrd.luks.sddmUnlock.theme = {
+      themeEnv = pkgs.runCommand "initrd-sddm-theme-env" rec {
+        __structuredAttrs = true;
+        nativeBuildInputs = with pkgs; [python3];
 
-      # - build a raw theme env first which we then trim down into a
-      rawEnv = pkgs.buildEnv {
-        name = "initrd-sddm-theme-env-raw";
-        paths = cfg.theme.packages;
-        includeClosures = true;
+        # - build a raw theme env first which we then trim down into a
+        rawEnv = pkgs.buildEnv {
+          name = "initrd-sddm-theme-env-raw";
+          paths = cfg.theme.packages;
+          includeClosures = true;
 
-        pathsToLink =
-          [
-            "/lib/qt-6"
-            "/share/sddm/themes/${cfg.theme.name}"
-          ]
-          ++ cfg.theme.extraPaths;
-      };
-      passthru.raw = rawEnv;
+          pathsToLink =
+            [
+              "/lib/qt-6"
+              "/share/sddm/themes/${cfg.theme.name}"
+            ]
+            ++ cfg.theme.extraPaths;
+        };
+        passthru.raw = rawEnv;
 
-      inherit (cfg.theme) qmlModules fixups extraPaths;
-    } "python3 ${./build-theme-env.py}";
+        inherit (cfg.theme) qmlModules fixups extraPaths;
+      } "python3 ${./build-theme-env.py}";
 
-    boot.initrd.luks.sddmUnlock.theme.extraPaths = [
-      "/share/locale/${lib.head (lib.splitString "_" cfg.locale)}"
-      "/share/locale/${lib.head (lib.splitString "." cfg.locale)}"
-      "/share/locale/${cfg.locale}"
-    ];
+      extraPaths = [
+        "/share/locale/${lib.head (lib.splitString "_" cfg.locale)}"
+        "/share/locale/${lib.head (lib.splitString "." cfg.locale)}"
+        "/share/locale/${cfg.locale}"
+      ];
+
+      extraClosureRules =
+        [
+          "!${cfg.theme.themeEnv}/lib/qt-6/"
+        ]
+        ++ (
+          map (p: "!${cfg.theme.themeEnv}/${
+            if lib.hasPrefix "/" p
+            then lib.removePrefix "/" p
+            else p
+          }/")
+          cfg.theme.extraPaths
+        );
+    };
 
     #Hook up theme Qt modules / plugins
     boot.initrd.systemd.services.luks-sddm.environment =
