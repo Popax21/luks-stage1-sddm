@@ -20,12 +20,6 @@
       defaultText = lib.literalExpression "config.services.displayManager.sddm.extraPackages";
     };
 
-    iconSets = lib.mkOption {
-      type = lib.types.listOf lib.types.str;
-      description = "The icon sets to expose to the SDDM greeter process. The first element of the list is set as the default Qt icon theme.";
-      default = ["hicolor"];
-    };
-
     envVars = lib.mkOption {
       type = lib.types.attrsOf lib.types.str;
       description = "Environment variables to set for the SDDM greeter process.";
@@ -52,6 +46,19 @@
         }
       '';
     };
+
+    extraPaths = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      description = "Extra paths to include in the SDDM theme environment.";
+      default = [];
+      example = ''
+        [
+          "/share/plasma/desktoptheme/default"
+          "/share/icons/breeze"
+        ]
+      '';
+    };
+
     fixups = lib.mkOption {
       type = lib.types.attrsOf lib.types.lines;
       description = "A set of commands which are used to fix up files in the SDDM theme environment.";
@@ -90,17 +97,20 @@
         pathsToLink =
           [
             "/lib/qt-6"
-            "/share/locale/${lib.head (lib.splitString "_" cfg.locale)}"
-            "/share/locale/${lib.head (lib.splitString "." cfg.locale)}"
-            "/share/locale/${cfg.locale}"
             "/share/sddm/themes/${cfg.theme.name}"
           ]
-          ++ (map (i: "/share/icons/${i}") cfg.theme.iconSets);
+          ++ cfg.theme.extraPaths;
       };
       passthru.raw = rawEnv;
 
-      inherit (cfg.theme) qmlModules fixups;
+      inherit (cfg.theme) qmlModules fixups extraPaths;
     } "python3 ${./build-theme-env.py}";
+
+    boot.initrd.luks.sddmUnlock.theme.extraPaths = [
+      "/share/locale/${lib.head (lib.splitString "_" cfg.locale)}"
+      "/share/locale/${lib.head (lib.splitString "." cfg.locale)}"
+      "/share/locale/${cfg.locale}"
+    ];
 
     #Hook up theme Qt modules / plugins
     boot.initrd.systemd.services.luks-sddm.environment =
@@ -110,8 +120,6 @@
 
         QT_PLUGIN_PATH = lib.makeSearchPath "lib/qt-6/plugins" ([cfg.theme.themeEnv] ++ qtPkgs);
         QML_IMPORT_PATH = lib.makeSearchPath "lib/qt-6/qml" ([cfg.theme.themeEnv] ++ qtPkgs);
-
-        QT_QPA_SYSTEM_ICON_THEME = lib.head cfg.theme.iconSets;
       };
 
     boot.initrd.luks.sddmUnlock = {

@@ -12,8 +12,9 @@ with open(os.environ["NIX_ATTRS_JSON_FILE"], "r") as q:
 
 out = Path(os.environ["out"])
 raw_env = Path(attrs["rawEnv"])
-qml_modules = attrs["qmlModules"]
-fixups = attrs["fixups"]
+qml_modules: dict[str, str] = attrs["qmlModules"]
+extra_paths: list[str] = attrs["extraPaths"]
+fixups: dict[str, str] = attrs["fixups"]
 
 
 def map_to_out_path(path: Path) -> Path:
@@ -389,12 +390,23 @@ for f in raw_env.glob("share/sddm/themes/**/*", recurse_symlinks=True):
     else:
         include_path(f)
 
-# copy over locale / icon data
-if (raw_env / "share" / "locale").exists():
-    include_path(raw_env / "share" / "locale")
+# copy over Qt plugins from substitute QML modules (since these are built for initrd conditions)
+for mod in map(Path, qml_modules.values()):
+    plugins = mod / "lib" / "qt-6" / "plugins"
+    if plugins.is_dir():
+        include_path(plugins)
 
-if (raw_env / "share" / "icons").exists():
-    include_path(raw_env / "share" / "icons")
+# copy over extra subdirs
+for p in extra_paths:
+    if p.startswith("/"):
+        p = p[1:]
+
+    if (raw_env / p).exists():
+        include_path(raw_env / p)
+
+    for mod in map(Path, qml_modules.values()):
+        if (mod / p).exists():
+            include_path(raw_env / p)
 
 # fixup QML modules
 i = 0

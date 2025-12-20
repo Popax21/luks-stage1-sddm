@@ -1,0 +1,39 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 05ae1d7..c3ea4c1 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -43,7 +43,6 @@ ecm_setup_version(PROJECT
+ 
+ # Dependencies
+ set(REQUIRED_QT_VERSION 6.8.0)
+-find_package(Qt6Widgets ${REQUIRED_QT_VERSION} REQUIRED NO_MODULE)
+ find_package(Qt6Svg ${REQUIRED_QT_VERSION} REQUIRED NO_MODULE)
+ 
+ if (Qt6Gui_VERSION VERSION_GREATER_EQUAL "6.10.0")
+@@ -68,7 +67,6 @@ endif()
+ 
+ find_package(KF6Archive ${KF_DEP_VERSION} REQUIRED)
+ find_package(KF6I18n ${KF_DEP_VERSION} REQUIRED)
+-find_package(KF6WidgetsAddons ${KF_DEP_VERSION} REQUIRED)
+ find_package(KF6ColorScheme ${KF_DEP_VERSION} REQUIRED)
+ 
+ # ensure we have our icons around on all platforms that require it
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index ef464ec..4e50a82 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -1,14 +1,8 @@
+ configure_file(config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
+ 
+-add_subdirectory(tools/kiconfinder)
+ if (KICONTHEMES_USE_QTQUICK)
+     add_subdirectory(qml)
+ endif()
+-if (APPLE)
+-    add_subdirectory(tools/ksvg2icns)
+-endif()
+-
+-add_subdirectory(widgets)
+ 
+ add_library(KF6IconThemes)
+ add_library(KF6::IconThemes ALIAS KF6IconThemes)

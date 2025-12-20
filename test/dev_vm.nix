@@ -17,7 +17,8 @@ in {
   meta.description = "Development VM";
   passthru = rec {
     inherit config;
-    sddmClosure = config.config.boot.initrd.luks.sddmUnlock.closureContents;
-    sddmConf = nixpkgs.lib.findFirst (p: p.name == "initrd-sddm.conf") null sddmClosure;
+    roots = nixpkgs.legacyPackages.${system}.runCommandLocal "luks-stage1-sddm-dev-vm-roots" {
+      propagatedBuildInputs = config.config.boot.initrd.luks.sddmUnlock.closureBuildDeps;
+    } "touch $out";
   };
 }

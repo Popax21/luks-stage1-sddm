@@ -1,7 +1,6 @@
 {
   config,
   lib,
-  pkgs,
   ...
 }: let
   cfg = config.boot.initrd.luks.sddmUnlock;
@@ -54,8 +53,9 @@ in {
         (fixup "org.kde.breeze.components:Battery" "echo -ne 'import QtQuick\\nItem {}' > $target")
       ];
 
-    #Setup the breeze icon theme
-    packages = [pkgs.kdePackages.breeze-icons];
-    iconSets = lib.mkBefore ["breeze"];
+    extraPaths = [
+      "/share/plasma/desktoptheme/default"
+      "/share/icons/breeze"
+    ];
   };
 }

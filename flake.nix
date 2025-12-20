@@ -27,18 +27,6 @@
         qt6-minimal = nixpkgs.lib.recurseIntoAttrs {
           inherit (flakePkgs.qt6-minimal) qtbase qtdeclarative qttools qt5compat;
         };
-
-        guiRoots = pkgs.runCommandLocal "luks-stage1-sddm" {
-          propagatedBuildInputs = with flakePkgs; [
-            qt6-minimal.qtbase
-            qt6-minimal.qtdeclarative
-            qt6-minimal.qttools
-            qt6-minimal.qt5compat
-            kde-minimal.kirigami
-            kde-minimal.ksvg
-            sddm-minimal
-          ];
-        } "touch $out";
       };
 
       checks =

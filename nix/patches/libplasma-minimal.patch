@@ -1,0 +1,308 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 714974abd..cec4bc26b 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -46,3 +46,3 @@ ecm_setup_version(PROJECT
+ 
+-find_package(Qt6 ${QT_MIN_VERSION} REQUIRED NO_MODULE COMPONENTS Quick Gui Qml Svg QuickControls2 DBus)
++find_package(Qt6 ${QT_MIN_VERSION} REQUIRED NO_MODULE COMPONENTS Quick Gui Qml Svg QuickControls2)
+ 
+@@ -56,3 +56,2 @@ find_package(KF6 ${KF6_MIN_VERSION} REQUIRED
+         CoreAddons
+-        GlobalAccel
+         GuiAddons
+@@ -60,6 +59,2 @@ find_package(KF6 ${KF6_MIN_VERSION} REQUIRED
+         IconThemes
+-        KIO
+-        WindowSystem
+-        Notifications
+-        Package
+         KirigamiPlatform
+@@ -68,8 +63,2 @@ find_package(KF6 ${KF6_MIN_VERSION} REQUIRED
+ )
+-find_package(PlasmaActivities REQUIRED ${PROJECT_DEP_VERSION})
+-
+-# Wayland features
+-find_package(PlasmaWaylandProtocols 1.10.0 REQUIRED)
+-find_package(Qt6WaylandClient ${QT_MIN_VERSION} REQUIRED CONFIG)
+-find_package(Wayland 1.9 REQUIRED Client)
+ 
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index e82503e70..c59fc6d60 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -3,3 +3,2 @@ add_subdirectory(plasma)
+ add_subdirectory(declarativeimports)
+-add_subdirectory(plasmaquick)
+ 
+diff --git a/src/declarativeimports/core/CMakeLists.txt b/src/declarativeimports/core/CMakeLists.txt
+index cf0bf03e2..355873cfe 100644
+--- a/src/declarativeimports/core/CMakeLists.txt
++++ b/src/declarativeimports/core/CMakeLists.txt
+@@ -13,5 +13,2 @@ target_sources(corebindingsplugin PRIVATE
+     corebindingsplugin.cpp
+-    tooltiparea.cpp
+-    tooltipdialog.cpp
+-    windowthumbnail.cpp
+ 
+@@ -19,5 +16,2 @@ target_sources(corebindingsplugin PRIVATE
+     corebindingsplugin.h
+-    tooltiparea.h
+-    tooltipdialog.h
+-    windowthumbnail.h
+     ${RESOURCES}
+@@ -37,7 +31,4 @@ target_link_libraries(corebindingsplugin PRIVATE
+         Qt6::Svg
+-        KF6::WindowSystem
+         KF6::I18nQml
+         Plasma::Plasma
+-        Plasma::PlasmaQuick
+-        Wayland::Client
+ )
+diff --git a/src/declarativeimports/core/corebindingsplugin.cpp b/src/declarativeimports/core/corebindingsplugin.cpp
+index 8c8db7c86..9fdbaf514 100644
+--- a/src/declarativeimports/core/corebindingsplugin.cpp
++++ b/src/declarativeimports/core/corebindingsplugin.cpp
+@@ -14,2 +14,4 @@
+ #include <QWindow>
++#include <QQuickItem>
++#include <QQuickWindow>
+ 
+@@ -18,2 +20,3 @@
+ #include "action.h"
++#include "theme.h"
+ #include <KLocalizedQmlContext>
+diff --git a/src/declarativeimports/core/corebindingsplugin.h b/src/declarativeimports/core/corebindingsplugin.h
+index 532ee2aed..b41c009f8 100644
+--- a/src/declarativeimports/core/corebindingsplugin.h
++++ b/src/declarativeimports/core/corebindingsplugin.h
+@@ -19,7 +19,2 @@
+ #include "action.h"
+-#include "applet.h"
+-#include "appletpopup.h"
+-#include "containment.h"
+-#include "corona.h"
+-#include "dialog.h"
+ 
+@@ -38,46 +33,2 @@ struct PropertyMapForeign {
+ 
+-struct PlasmaWindowForeign {
+-    Q_GADGET
+-    QML_NAMED_ELEMENT(Window)
+-    QML_FOREIGN(PlasmaQuick::PlasmaWindow)
+-};
+-
+-struct AppletPopupForeign {
+-    Q_GADGET
+-    QML_NAMED_ELEMENT(AppletPopup)
+-    QML_FOREIGN(PlasmaQuick::AppletPopup)
+-};
+-
+-struct PopupPlasmaWindowForeign {
+-    Q_GADGET
+-    QML_NAMED_ELEMENT(PopupPlasmaWindow)
+-    QML_FOREIGN(PlasmaQuick::PopupPlasmaWindow)
+-};
+-
+-struct DialogForeign {
+-    Q_GADGET
+-    QML_NAMED_ELEMENT(Dialog)
+-    QML_FOREIGN(PlasmaQuick::Dialog)
+-};
+-
+-struct ContainmentForeign {
+-    Q_GADGET
+-    QML_NAMED_ELEMENT(Containment)
+-    QML_UNCREATABLE("")
+-    QML_FOREIGN(Plasma::Containment)
+-};
+-
+-struct CoronaForeign {
+-    Q_GADGET
+-    QML_ANONYMOUS
+-    QML_FOREIGN(Plasma::Corona)
+-};
+-
+-struct AppletForeign {
+-    Q_GADGET
+-    QML_NAMED_ELEMENT(Applet)
+-    QML_UNCREATABLE("")
+-    QML_FOREIGN(Plasma::Applet)
+-};
+-
+ struct ActionForeign {
+diff --git a/src/declarativeimports/plasmaextracomponents/CMakeLists.txt b/src/declarativeimports/plasmaextracomponents/CMakeLists.txt
+index 1a7827819..99c8aec15 100644
+--- a/src/declarativeimports/plasmaextracomponents/CMakeLists.txt
++++ b/src/declarativeimports/plasmaextracomponents/CMakeLists.txt
+@@ -43,3 +43,2 @@ target_link_libraries(plasmaextracomponentsplugin PRIVATE
+         Qt6::Widgets
+-        KF6::WidgetsAddons
+         Plasma::Plasma)
+diff --git a/src/declarativeimports/plasmaextracomponents/qmenu.cpp b/src/declarativeimports/plasmaextracomponents/qmenu.cpp
+index fe8f8e572..c10ae07ee 100644
+--- a/src/declarativeimports/plasmaextracomponents/qmenu.cpp
++++ b/src/declarativeimports/plasmaextracomponents/qmenu.cpp
+@@ -16,3 +16,2 @@
+ 
+-#include <KAcceleratorManager>
+ #include <optional>
+@@ -35,3 +34,2 @@ QMenuProxy::QMenuProxy(QObject *parent)
+ 
+-        KAcceleratorManager::manage(m_menu);
+         connect(m_menu, &QMenu::triggered, this, &QMenuProxy::itemTriggered);
+diff --git a/src/plasma/CMakeLists.txt b/src/plasma/CMakeLists.txt
+index 37c4079ec..25cca57c9 100644
+--- a/src/plasma/CMakeLists.txt
++++ b/src/plasma/CMakeLists.txt
+@@ -1,3 +1 @@
+-add_subdirectory(packagestructure)
+-
+ # Consumer's include dir which has to be explicitly used to make headers of this lib visible to documented includes
+@@ -23,11 +21,2 @@ target_sources(Plasma PRIVATE
+     plasma.cpp
+-    pluginloader.cpp
+-
+-#applets,containments,corona
+-    applet.cpp
+-    containment.cpp
+-    containmentactions.cpp
+-    corona.cpp
+-    private/applet_p.cpp
+-    private/containment_p.cpp
+ 
+@@ -36,14 +25,4 @@ target_sources(Plasma PRIVATE
+     private/theme_p.cpp
+-    private/blureffectwatcher.cpp
+ 
+     plasma.h
+-    pluginloader.h
+-
+-#applets,containments,corona
+-    applet.h
+-    containment.h
+-    containmentactions.h
+-    corona.h
+-    private/applet_p.h
+-    private/containment_p.h
+ 
+@@ -52,3 +31,2 @@ target_sources(Plasma PRIVATE
+     private/theme_p.h
+-    private/blureffectwatcher_p.h
+ )
+@@ -58,7 +36,3 @@ if (Qt6_VERSION VERSION_GREATER_EQUAL "6.8.0")
+ endif()
+-qt6_generate_wayland_protocol_client_sources(Plasma
+-    ${private_code_option}
+-    FILES
+-        ${PLASMA_WAYLAND_PROTOCOLS_DIR}/blur.xml
+-)
++
+ 
+@@ -97,3 +71,3 @@ PRIVATE
+     Qt6::Quick
+-    Qt6::WaylandClient
++    Qt6::Widgets
+     KF6::ConfigGui
+@@ -102,7 +76,3 @@ PRIVATE
+     KF6::I18n
+-    KF6::WindowSystem #compositingActive
+-    KF6::GlobalAccel #Applet::setGlobalShortcut
+-    KF6::Notifications
+     KF6::IconThemes
+-    Plasma::Activities
+     KF6::Svg
+@@ -111,4 +81,2 @@ PRIVATE
+ 
+-target_link_libraries(Plasma PRIVATE KF6::Package)
+-
+ set(Plasma_BUILD_INCLUDE_DIRS
+diff --git a/src/plasma/plasma.cpp b/src/plasma/plasma.cpp
+index 2d70601c9..1e3366d8f 100644
+--- a/src/plasma/plasma.cpp
++++ b/src/plasma/plasma.cpp
+@@ -12,4 +12,2 @@
+ 
+-#include "containment.h"
+-
+ namespace Plasma
+diff --git a/src/plasma/private/theme_p.cpp b/src/plasma/private/theme_p.cpp
+index 6e0e25821..0f548467b 100644
+--- a/src/plasma/private/theme_p.cpp
++++ b/src/plasma/private/theme_p.cpp
+@@ -17,5 +17,2 @@
+ #include <KSharedConfig>
+-#include <KWindowEffects>
+-#include <KWindowSystem>
+-#include <KX11Extras>
+ 
+@@ -25,4 +22,2 @@ const char ThemePrivate::defaultTheme[] = "default";
+ 
+-BlurEffectWatcher *ThemePrivate::s_blurEffectWatcher = nullptr;
+-
+ ThemePrivate *ThemePrivate::globalTheme = nullptr;
+@@ -80,3 +75,3 @@ ThemePrivate::ThemePrivate(QObject *parent)
+     , compositingActive(true)
+-    , backgroundContrastActive(KWindowEffects::isEffectAvailable(KWindowEffects::BackgroundContrast))
++    , backgroundContrastActive(false)
+     , isDefault(true)
+@@ -94,6 +89,2 @@ ThemePrivate::ThemePrivate(QObject *parent)
+ {
+-    if (KWindowSystem::isPlatformX11()) {
+-        compositingActive = KX11Extras::self()->compositingActive();
+-    }
+-
+     kSvgImageSet = std::unique_ptr<KSvg::ImageSet>(new KSvg::ImageSet);
+@@ -117,10 +108,2 @@ ThemePrivate::ThemePrivate(QObject *parent)
+ 
+-    if (QPixmap::defaultDepth() > 8) {
+-        // watch for background contrast effect property changes as well
+-        if (!s_blurEffectWatcher) {
+-            s_blurEffectWatcher = new BlurEffectWatcher();
+-        }
+-
+-        QObject::connect(s_blurEffectWatcher, &BlurEffectWatcher::effectChanged, selectorsUpdateTimer, qOverload<>(&QTimer::start));
+-    }
+     QCoreApplication::instance()->installEventFilter(this);
+@@ -137,5 +120,2 @@ ThemePrivate::ThemePrivate(QObject *parent)
+ 
+-    if (KWindowSystem::isPlatformX11()) {
+-        connect(KX11Extras::self(), &KX11Extras::compositingChanged, selectorsUpdateTimer, qOverload<>(&QTimer::start));
+-    }
+     updateKSvgSelectors();
+@@ -170,12 +150,4 @@ void ThemePrivate::updateKSvgSelectors()
+ {
+-#if HAVE_X11
+-    if (KWindowSystem::isPlatformX11()) {
+-        compositingActive = KX11Extras::compositingActive();
+-    } else {
+-        compositingActive = true;
+-    }
+-#else
+     compositingActive = true;
+-#endif
+-    backgroundContrastActive = s_blurEffectWatcher->isEffectActive();
++    backgroundContrastActive = false;
+ 
+diff --git a/src/plasma/private/theme_p.h b/src/plasma/private/theme_p.h
+index c23b32113..d0012513f 100644
+--- a/src/plasma/private/theme_p.h
++++ b/src/plasma/private/theme_p.h
+@@ -24,4 +24,2 @@
+ 
+-#include "private/blureffectwatcher_p.h"
+-
+ namespace Plasma
+@@ -65,4 +63,2 @@ public:
+ 
+-    static BlurEffectWatcher *s_blurEffectWatcher;
+-
+     // Ref counting of ThemePrivate instances
+diff --git a/src/plasma/theme.cpp b/src/plasma/theme.cpp
+index 6f00e54d5..9f1904b4b 100644
+--- a/src/plasma/theme.cpp
++++ b/src/plasma/theme.cpp
+@@ -21,3 +21,2 @@
+ #include <KConfigGroup>
+-#include <KWindowEffects>
+ #include <QDebug>
