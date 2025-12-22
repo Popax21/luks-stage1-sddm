@@ -75,7 +75,7 @@ in {
     };
 
     rootBuildDeps = lib.mkOption {
-      type = lib.bool;
+      type = lib.types.bool;
       default = true;
       description = "Keep the build dependencies of the SDDM initrd closure alive.";
     };

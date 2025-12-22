@@ -27,6 +27,19 @@
         inherit (flakePkgs) mesa-minimal sddm-minimal luks-stage1-sddm sddm-daemon;
         qt6-minimal = lib.recurseIntoAttrs (lib.filterAttrs (_: lib.isDerivation) (removeAttrs flakePkgs.qt6-minimal ["full"]));
         kde-minimal = lib.recurseIntoAttrs (lib.filterAttrs (_: lib.isDerivation) (removeAttrs flakePkgs.kde-minimal (lib.attrNames flakePkgs.qt6-minimal)));
+
+        optionsDoc = let
+          options =
+            (nixpkgs.lib.nixosSystem {
+              modules = [
+                {nixpkgs.system = system;}
+                nix/nixos/module.nix
+              ];
+            }).options;
+        in
+          (pkgs.nixosOptionsDoc {options = options.boot.initrd.luks.sddmUnlock;}).optionsCommonMark.overrideAttrs (old: {
+            buildCommand = old.buildCommand + "sed -i 's|file://${self}/||;s|${self}/||' $out";
+          });
       };
 
       checks = {
