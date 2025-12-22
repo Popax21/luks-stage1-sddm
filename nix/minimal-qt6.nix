@@ -1,5 +1,4 @@
 {
-  lib,
   stdenv,
   cmake,
   ninja,
@@ -19,14 +18,19 @@
   zstd,
   libinput,
   libxkbcommon,
-  xkeyboard_config,
   libdrm,
+  libgbm,
+  libglvnd,
 }:
-qt6.overrideScope (final: prev: {
+(qt6.override {inherit stdenv;}).overrideScope (final: prev: {
   qtbase = stdenv.mkDerivation rec {
     pname = "qtbase-minimal";
     inherit (qt6.srcs.qtbase) version src;
-    patches = qt6.qtbase.patches ++ [patches/qtbase-linuxfb-platform-theme.patch];
+
+    patches = qt6.qtbase.patches ++ [
+      patches/qtbase-linuxfb-platform-theme.patch
+      patches/qtbase-eglfs-kms-desktop-gl.patch
+    ];
 
     strictDeps = true;
     enableParallelBuilding = true;
@@ -47,21 +51,11 @@ qt6.overrideScope (final: prev: {
       zstd
 
       #QPA stuff
-      (libinput.override {
-        # - wacom support pulls in the entirety of Python ._.
-        wacomSupport = false;
-      })
-      (libxkbcommon.overrideAttrs {
-        # - don't depend on libx11 / libwayland
-        outputs = ["out"];
-        mesonFlags = [
-          "-Denable-docs=false"
-          "-Denable-x11=false"
-          "-Denable-wayland=false"
-          "-Dxkb-config-root=${xkeyboard_config}/etc/X11/xkb"
-        ];
-      })
+      libinput
+      libxkbcommon
       libdrm
+      libgbm
+      libglvnd
     ];
 
     nativeBuildInputs = [
@@ -80,14 +74,18 @@ qt6.overrideScope (final: prev: {
       "-DINSTALL_QMLDIR=${qtQmlPrefix}"
       "-DQT_EMBED_TOOLCHAIN_COMPILER=OFF"
 
-      "-DINPUT_opengl=no"
       "-DFEATURE_dbus=OFF"
       "-DFEATURE_sql=OFF"
+      "-DFEATURE_vnc=OFF"
       "-DFEATURE_printsupport=OFF"
       "-DFEATURE_testlib=OFF"
       "-DFEATURE_libinput=ON"
+      "-DFEATURE_eglfs=ON"
+      "-DFEATURE_eglfs_gbm=ON"
+      "-DINPUT_opengl=desktop"
+
       "-DQT_SKIP_AUTO_PLUGIN_INCLUSION=ON"
-      "-DQT_QPA_PLATFORMS=linuxfb"
+      "-DQT_QPA_PLATFORMS=linuxfb;eglfs"
     ];
 
     env.NIX_CFLAGS_COMPILE = "-DNIXPKGS_QT_PLUGIN_PREFIX=\"${qtPluginPrefix}\"";
@@ -152,26 +150,4 @@ qt6.overrideScope (final: prev: {
         # "quicktemplates2_container" # - can't be disabled because of a Qt bug :/
       ]);
   });
-
-  replaceQtPkgs = pkg: let
-    replaceDep = dep:
-      if lib.isDerivation dep
-      then final.${dep.pname or dep.name} or dep
-      else dep;
-
-    replaceNativeDep = dep:
-      if lib.isDerivation dep && dep.name == "wrap-qt6-apps-hook"
-      then final.wrapQtAppsHook
-      else replaceDep dep;
-  in
-    if lib.isDerivation pkg
-    then
-      pkg.overrideAttrs (old: {
-        buildInputs = map replaceDep (old.buildInputs or []);
-        propagatedBuildInputs = map replaceDep (old.propagatedBuildInputs or []);
-
-        nativeBuildInputs = map replaceNativeDep (old.nativeBuildInputs or []);
-        propagatedNativeBuildInputs = map replaceNativeDep (old.propagatedNativeBuildInputs or []);
-      })
-    else pkg;
 })

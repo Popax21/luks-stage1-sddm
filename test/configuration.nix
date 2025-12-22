@@ -18,12 +18,18 @@
     #Configure the VM
     nix.enable = false;
     virtualisation = {
-      diskImage = lib.mkIf (!sideload) null;
+      memorySize = 4096;
+
       graphics = true;
+      resolution.x = 1920;
+      resolution.y = 1080;
+
+      diskImage = lib.mkIf (!sideload) null;
       restrictNetwork = true;
+      qemu.options = ["-vga virtio" "-serial stdio"];
+
       useBootLoader = lib.mkIf sideload true;
       useEFIBoot = lib.mkIf sideload true;
-      qemu.options = ["-serial stdio"];
     };
     networking.dhcpcd.enable = false;
     services.journald.console = "/dev/ttyS0";
@@ -124,6 +130,18 @@
             [Desktop Entry]
             DesktopNames=FakeDE
             Name=Fake Desktop Environment
+            Exec=sleep 5
+            TryExec=/bin/sh
+          '';
+        })
+        (pkgs.writeTextFile {
+          name = "fake-de2-session";
+          destination = "/share/wayland-sessions/fake-de2.desktop";
+          passthru.providedSessions = ["fake-de2"];
+          text = ''
+            [Desktop Entry]
+            DesktopNames=FakeDE2
+            Name=Fake Desktop Environment 2
             Exec=sleep 5
             TryExec=/bin/sh
           '';

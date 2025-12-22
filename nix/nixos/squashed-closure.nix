@@ -52,6 +52,7 @@
         "${matchPkg "glib"}/lib/(?!libglib-2.0.so)[^/]+" # - we only need libglib-2.0.so
         "${matchPkg "systemd-minimal-libs"}/lib/(?!libudev.so)[^/]+" # - we only need udev
         "!${matchPkg "xkeyboard-config"}/etc" # - is a symlink
+        "!${matchPkg "mesa"}/lib/gbm/" # - Mesa stuff
 
         # - include the binaries we actually use
         "!${matchPkg "luks-stage1-sddm"}/bin/luks-stage1-sddm-daemon"
@@ -188,7 +189,7 @@ in {
 
     #Pin the initrd closure packages (if enabled)
     nixpkgs.overlays = lib.optional (cfg.pinPkgs != null) (final: prev: {
-      luks-stage1-sddm = prev.luks-stage1-sddm.overrideScope (cfg.pinPkgs final.stdenv.targetPlatform.system);
+      luks-stage1-sddm = lib.makeScope (cfg.pinPkgs final.stdenv.targetPlatform.system).newScope prev.luks-stage1-sddm.packages;
     });
 
     #Keep the closure build dependencies alive (if enabled)

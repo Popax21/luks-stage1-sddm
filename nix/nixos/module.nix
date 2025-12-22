@@ -7,6 +7,21 @@
   cfg = config.boot.initrd.luks.sddmUnlock;
   dmCfg = config.services.displayManager;
 
+  glibcLocales = pkgs.glibcLocales.override {
+    allLocales = false;
+    locales = ["C.UTF-8/UTF-8" "${cfg.locale}/UTF-8"];
+  };
+
+  elgfsKmsConfig = pkgs.writeText "initrd-eglfs-kms-config" (builtins.toJSON {
+    hwcursor = false;
+    outputs = [
+      {
+        name = "Virtual1";
+        mode = "1920x1080";
+      }
+    ];
+  });
+
   defaultConfig =
     {
       LUKSUnlock.Greeter = lib.getExe' cfg.packages.sddm-minimal "sddm-greeter-qt6";
@@ -36,11 +51,6 @@
 
   iniFmt = pkgs.formats.ini {listsAsDuplicateKeys = true;};
   sddmConfig = iniFmt.generate "initrd-sddm.conf" (lib.recursiveUpdate defaultConfig cfg.settings);
-
-  glibcLocales = pkgs.glibcLocales.override {
-    allLocales = false;
-    locales = ["C.UTF-8/UTF-8" "${cfg.locale}/UTF-8"];
-  };
 in {
   imports = [./squashed-closure.nix ./sddm-handoff.nix ./theming.nix];
 
@@ -116,9 +126,12 @@ in {
             xkb = config.services.xserver.xkb;
           in {
             # - configure the embedded QT backend
-            QT_QPA_PLATFORM = "linuxfb";
-            QT_QPA_PLATFORMTHEME = "generic";
-            QT_QPA_FB_DRM = "1";
+            QT_QPA_PLATFORM = "eglfs";
+            QT_QPA_EGLFS_INTEGRATION = "eglfs_kms"; # - can't use 'eglfs_kms_egldevice' since "we don't yet support EGL_DEVICE_DRM for the software device"
+            QT_QPA_EGLFS_KMS_CONFIG = toString elgfsKmsConfig;
+
+            __EGL_VENDOR_LIBRARY_FILENAMES = "${cfg.packages.mesa-minimal}/share/glvnd/egl_vendor.d/50_mesa.json";
+            GBM_BACKENDS_PATH = "${cfg.packages.mesa-minimal}/lib/gbm";
 
             # - configure the locale
             LC_ALL = cfg.locale;
@@ -168,7 +181,7 @@ in {
       availableKernelModules = ["evdev" "overlay"]; # - required for input / etc.
 
       #Configure the closure of things that are compressed / optionally sideloaded (handled in ./squashed-closure.nix)
-      luks.sddmUnlock.closureContents = [glibcLocales cfg.packages.sddm-daemon sddmConfig];
+      luks.sddmUnlock.closureContents = [glibcLocales cfg.packages.mesa-minimal cfg.packages.sddm-daemon elgfsKmsConfig sddmConfig];
 
       #Configure infinite retries for all devices we should unlock
       luks.devices = lib.genAttrs cfg.luksDevices (_: {crypttabExtraOpts = ["tries=0"];});

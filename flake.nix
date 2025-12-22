@@ -16,32 +16,31 @@
   }:
     (flake-utils.lib.eachSystem (builtins.filter (nixpkgs.lib.hasInfix "linux") flake-utils.lib.defaultSystems) (system: let
       pkgs = nixpkgs.legacyPackages.${system};
+      lib = pkgs.lib;
+
       flakePkgs = import nix/packages.nix {
         inherit pkgs;
         crane = crane.mkLib;
       };
     in rec {
       packages = flake-utils.lib.flattenTree {
-        inherit (flakePkgs) sddm-minimal luks-stage1-sddm sddm-daemon;
-
-        qt6-minimal = nixpkgs.lib.recurseIntoAttrs {
-          inherit (flakePkgs.qt6-minimal) qtbase qtdeclarative qttools qt5compat;
-        };
+        inherit (flakePkgs) mesa-minimal sddm-minimal luks-stage1-sddm sddm-daemon;
+        qt6-minimal = lib.recurseIntoAttrs (lib.filterAttrs (_: lib.isDerivation) (removeAttrs flakePkgs.qt6-minimal ["full"]));
+        kde-minimal = lib.recurseIntoAttrs (lib.filterAttrs (_: lib.isDerivation) (removeAttrs flakePkgs.kde-minimal (lib.attrNames flakePkgs.qt6-minimal)));
       };
 
-      checks =
-        packages
-        // {
-          rustfmt = flakePkgs.craneLib.cargoFmt {
-            src = ./.;
-          };
-          clippy = flakePkgs.craneLib.cargoClippy {
-            src = ./.;
+      checks = {
+        inherit (flakePkgs) luks-stage1-sddm sddm-daemon;
 
-            inherit (flakePkgs) cargoArtifacts;
-            cargoClippyExtraArgs = "--all-targets --all-features -- --deny warnings";
-          };
+        rustfmt = flakePkgs.craneLib.cargoFmt {
+          src = ./.;
         };
+        clippy = flakePkgs.craneLib.cargoClippy {
+          src = ./.;
+          inherit (flakePkgs) cargoArtifacts;
+          cargoClippyExtraArgs = "--all-targets --all-features -- --deny warnings";
+        };
+      };
 
       devShells.default = flakePkgs.craneLib.devShell {
         checks = checks;

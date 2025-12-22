@@ -17,7 +17,7 @@ in {
   meta.description = "Development VM";
 
   inherit config;
-  roots = nixpkgs.legacyPackages.${system}.runCommandLocal "luks-stage1-sddm-dev-vm-roots" {
-    propagatedBuildInputs = config.config.boot.initrd.luks.sddmUnlock.closureBuildDeps;
-  } "touch $out";
+  roots = nixpkgs.legacyPackages.${system}.runCommandLocal "luks-stage1-sddm-dev-vm-roots" {} (
+    nixpkgs.lib.concatLines (map (r: "echo ${r} >> $out") config.config.boot.initrd.luks.sddmUnlock.closureBuildDeps)
+  );
 }

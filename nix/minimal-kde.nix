@@ -1,15 +1,18 @@
 {
-  lib,
+  stdenv,
   cmake,
   ninja,
   kdePackages,
   qt6-minimal,
+  qt6Packages,
   ...
 }: let
-  kdePackages' = kdePackages.overrideScope (final: prev: {kirigami = prev.kirigami.unwrapped;});
-  kdePackages'' = kdePackages'.overrideScope (_: lib.mapAttrs (_: qt6-minimal.replaceQtPkgs));
+  qt6Packages' = qt6Packages.overrideScope (_: _: qt6-minimal);
 in
-  kdePackages''.overrideScope (final: prev: {
+  (kdePackages.override {qt6Packages = qt6Packages';}).overrideScope (final: prev: {
+    inherit stdenv;
+    qt6 = qt6-minimal;
+
     kconfig = prev.kconfig.overrideAttrs (old: {
       cmakeFlags = (old.cmakeFlags or []) ++ ["-DUSE_DBUS=OFF"];
     });
@@ -22,9 +25,10 @@ in
     kguiaddons = prev.kguiaddons.overrideAttrs (old: {
       cmakeFlags = (old.cmakeFlags or []) ++ ["-DUSE_DBUS=OFF" "-DWITH_X11=OFF" "-DWITH_WAYLAND=OFF" "-DBUILD_PYTHON_BINDINGS=OFF"];
     });
-    kirigami = prev.kirigami.overrideAttrs (old: {
+    kirigami = prev.kirigami.unwrapped.overrideAttrs (old: {
       patches = (old.patches or []) ++ [patches/kirigami-no-http-icons.patch];
       cmakeFlags = (old.cmakeFlags or []) ++ ["-DUSE_DBUS=OFF"];
+      passthru.unwrapped = final.kirigami;
     });
 
     kiconthemes = prev.kiconthemes.overrideAttrs (old: {

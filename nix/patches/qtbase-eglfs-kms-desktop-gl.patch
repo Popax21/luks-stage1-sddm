@@ -1,0 +1,12 @@
+diff --git a/src/plugins/platforms/eglfs/deviceintegration/eglfs_kms_support/qeglfskmsintegration.cpp b/src/plugins/platforms/eglfs/deviceintegration/eglfs_kms_support/qeglfskmsintegration.cpp
+index 26420b44..cca7ee8e 100644
+--- a/src/plugins/platforms/eglfs/deviceintegration/eglfs_kms_support/qeglfskmsintegration.cpp
++++ b/src/plugins/platforms/eglfs/deviceintegration/eglfs_kms_support/qeglfskmsintegration.cpp
+@@ -67,7 +67,6 @@ void QEglFSKmsIntegration::screenInit()
+ QSurfaceFormat QEglFSKmsIntegration::surfaceFormatFor(const QSurfaceFormat &inputFormat) const
+ {
+     QSurfaceFormat format(inputFormat);
+-    format.setRenderableType(QSurfaceFormat::OpenGLES);
+     format.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
+     format.setRedBufferSize(8);
+     format.setGreenBufferSize(8);
