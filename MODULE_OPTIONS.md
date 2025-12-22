@@ -104,12 +104,7 @@ null or string
 
 
 *Example:*
-
-```
-''
-  "1920x1080" # or: "off", "current", "preferred", "skip", "1920x1080@60", ...
-''
-```
+` "1920x1080" # or: "off", "current", "preferred", "skip", "1920x1080@60", ... `
 
 *Declared by:*
  - [nix/nixos/module\.nix](nix/nixos/module.nix)
@@ -409,11 +404,9 @@ attribute set of string
 *Example:*
 
 ```
-''
-  {
-    QT_QPA_SYSTEM_ICON_THEME = "breeze";
-  }
-''
+{
+  QT_QPA_SYSTEM_ICON_THEME = "breeze";
+}
 ```
 
 *Declared by:*
@@ -436,6 +429,20 @@ list of string
 
 *Default:*
 ` [ ] `
+
+
+
+*Example:*
+
+```
+[
+  "${somePkg}/excludeFile"
+  "!${somePkg}/includeFile"
+
+  "${somePkg}/excludeFolder/"
+  "!${somePkg}/includeFolder/"
+]
+```
 
 *Declared by:*
  - [nix/nixos/theming\.nix](nix/nixos/theming.nix)
@@ -463,12 +470,10 @@ list of string
 *Example:*
 
 ```
-''
-  [
-    "/share/plasma/desktoptheme/default"
-    "/share/icons/breeze"
-  ]
-''
+[
+  "/share/plasma/desktoptheme/default"
+  "/share/icons/breeze"
+]
 ```
 
 *Declared by:*
@@ -497,12 +502,10 @@ attribute set of strings concatenated with “\\n”
 *Example:*
 
 ```
-''
-  {
-    "some/file" = "rm $target";
-    "some/directory/" = "echo 'hi' >> $target";
-  }
-''
+{
+  "some/directory/" = "echo 'hi' >> $target";
+  "some/file" = "rm $target";
+}
 ```
 
 *Declared by:*
@@ -552,11 +555,9 @@ attribute set of package
 *Example:*
 
 ```
-''
-  {
-    "org.kde.ksvg" = pkgs.luks-stag1-sddm.kde-minimal.ksvg;
-  }
-''
+{
+  "org.kde.ksvg" = pkgs.luks-stag1-sddm.kde-minimal.ksvg;
+}
 ```
 
 *Declared by:*

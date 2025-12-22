@@ -93,9 +93,7 @@ in {
             type = lib.types.nullOr lib.types.str;
             description = "The output mode to set the screen to.";
             default = null;
-            example = ''
-              "1920x1080" # or: "off", "current", "preferred", "skip", "1920x1080@60", ...
-            '';
+            example = lib.literalExpression ''"1920x1080" # or: "off", "current", "preferred", "skip", "1920x1080@60", ...'';
           };
 
           virtualIndex = lib.mkOption {

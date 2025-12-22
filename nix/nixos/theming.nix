@@ -68,51 +68,54 @@ in {
       type = lib.types.attrsOf lib.types.package;
       description = "A set of initrd-suitable QML modules which are used to replace existing ones in the SDDM theme environment.";
       default = {};
-      example = ''
+      example = lib.literalExpression (lib.trim ''
         {
           "org.kde.ksvg" = pkgs.luks-stag1-sddm.kde-minimal.ksvg;
         }
-      '';
+      '');
     };
 
     envVars = lib.mkOption {
       type = lib.types.attrsOf lib.types.str;
       description = "Environment variables to set for the SDDM greeter process.";
       default = {};
-      example = ''
-        {
-          QT_QPA_SYSTEM_ICON_THEME = "breeze";
-        }
-      '';
+      example = {
+        QT_QPA_SYSTEM_ICON_THEME = "breeze";
+      };
     };
 
     extraPaths = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       description = "Extra paths to include in the SDDM theme environment.";
       default = [];
-      example = ''
-        [
-          "/share/plasma/desktoptheme/default"
-          "/share/icons/breeze"
-        ]
-      '';
+      example = [
+        "/share/plasma/desktoptheme/default"
+        "/share/icons/breeze"
+      ];
     };
     extraClosureRules = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       description = "Extra exclusion rules to apply when building the initrd closure.";
       default = [];
+      example = lib.literalExpression (lib.trim ''
+        [
+          "''${somePkg}/excludeFile"
+          "!''${somePkg}/includeFile"
+
+          "''${somePkg}/excludeFolder/"
+          "!''${somePkg}/includeFolder/"
+        ]
+      '');
     };
 
     fixups = lib.mkOption {
       type = lib.types.attrsOf lib.types.lines;
       description = "A set of commands which are used to fix up files in the SDDM theme environment.";
       default = {};
-      example = ''
-        {
-          "some/file" = "rm $target";
-          "some/directory/" = "echo 'hi' >> $target";
-        }
-      '';
+      example = {
+        "some/file" = "rm $target";
+        "some/directory/" = "echo 'hi' >> $target";
+      };
     };
 
     themeEnv = lib.mkOption {
