@@ -12,14 +12,18 @@
     locales = ["C.UTF-8/UTF-8" "${cfg.locale}/UTF-8"];
   };
 
-  elgfsKmsConfig = pkgs.writeText "initrd-eglfs-kms-config" (builtins.toJSON {
-    hwcursor = false;
-    outputs = [
-      {
-        name = "Virtual1";
-        mode = "1920x1080";
-      }
-    ];
+  kmsConfig = pkgs.writeText "initrd-kms-config.json" (builtins.toJSON {
+    hwcursor = !cfg.theme.qtSwRendering;
+    outputs =
+      lib.mapAttrsToList (name: cfg: (lib.filterAttrs (_: v: v != null) {
+        inherit name;
+        inherit (cfg) mode virtualIndex;
+        virtualPos =
+          if cfg.virtualPos != null
+          then "${cfg.virtualPos.x},${cfg.virtualPos.y}"
+          else null;
+      }))
+      cfg.displayOutputs;
   });
 
   defaultConfig =
@@ -77,6 +81,49 @@ in {
       '';
     };
 
+    displayOutputs = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.submodule {
+        options = {
+          mode = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            description = "The output mode to set the screen to.";
+            default = null;
+            example = ''
+              "1920x1080" # or: "off", "current", "preferred", "skip", "1920x1080@60", ...
+            '';
+          };
+
+          virtualIndex = lib.mkOption {
+            type = lib.types.nullOr lib.types.ints.unsigned;
+            description = "The index of the screen in the virtual desktop. Screens are arranged from left-to-right in order of ascending virtual indices.";
+            default = null;
+          };
+
+          virtualPos = lib.mkOption {
+            type = lib.types.nullOr (lib.types.submodule {
+              option.x = lib.mkOption {
+                type = lib.types.int;
+                description = "The X coordinate of the screen on the virtual desktop.";
+              };
+              option.y = lib.mkOption {
+                type = lib.types.int;
+                description = "The Y coordinate of the screen on the virtual desktop.";
+              };
+            });
+            description = "The position of the screen on the virtual desktop. This can be used to override the default positioning logic based on `virtualIndex`.";
+            default = null;
+          };
+        };
+      });
+      description = "Configuration of output display to use with SDDM. Screens are arranged in a virtual desktop-like layout.";
+      default = {};
+    };
+    displayDpi = lib.mkOption {
+      type = lib.types.ints.positive;
+      description = "The DPI of the output display. Note that DPI may not be specified per-screen, and must be identical when multiple monitors are in-use.";
+      default = 96;
+    };
+
     locale = lib.mkOption {
       type = lib.types.str;
       description = "The locale used by the SDDM greeter.";
@@ -122,27 +169,41 @@ in {
             fi
           '';
 
-          environment = let
-            xkb = config.services.xserver.xkb;
-          in {
+          environment = lib.mkMerge [
             # - configure the embedded QT backend
-            QT_QPA_PLATFORM = "eglfs";
-            QT_QPA_EGLFS_INTEGRATION = "eglfs_kms"; # - can't use 'eglfs_kms_egldevice' since "we don't yet support EGL_DEVICE_DRM for the software device"
-            QT_QPA_EGLFS_KMS_CONFIG = toString elgfsKmsConfig;
+            (
+              if !cfg.theme.qtSwRendering
+              then {
+                QT_QPA_PLATFORM = "eglfs";
+                QT_QPA_EGLFS_INTEGRATION = "eglfs_kms"; # - can't use 'eglfs_kms_egldevice' since "we don't yet support EGL_DEVICE_DRM for the software device"
+                GBM_BACKENDS_PATH = "${cfg.packages.mesa-minimal}/lib/gbm";
+                __EGL_VENDOR_LIBRARY_FILENAMES = "${cfg.packages.mesa-minimal}/share/glvnd/egl_vendor.d/50_mesa.json";
+              }
+              else {
+                QT_QPA_PLATFORM = "linuxfb";
+              }
+            )
 
-            __EGL_VENDOR_LIBRARY_FILENAMES = "${cfg.packages.mesa-minimal}/share/glvnd/egl_vendor.d/50_mesa.json";
-            GBM_BACKENDS_PATH = "${cfg.packages.mesa-minimal}/lib/gbm";
+            {
+              # - configure the display outputs
+              QT_QPA_KMS_CONFIG = toString kmsConfig;
+              QT_FONT_DPI = toString cfg.displayDpi;
 
-            # - configure the locale
-            LC_ALL = cfg.locale;
-            LOCALE_ARCHIVE = "${glibcLocales}/lib/locale/locale-archive";
+              # - configure the locale
+              LC_ALL = cfg.locale;
+              LOCALE_ARCHIVE = "${glibcLocales}/lib/locale/locale-archive";
+            }
 
             # - configure the keyboard layout
-            XKB_DEFAULT_MODEL = xkb.model;
-            XKB_DEFAULT_LAYOUT = xkb.layout;
-            XKB_DEFAULT_OPTIONS = xkb.options;
-            XKB_DEFAULT_VARIANT = xkb.variant;
-          };
+            (let
+              xkb = config.services.xserver.xkb;
+            in {
+              XKB_DEFAULT_MODEL = xkb.model;
+              XKB_DEFAULT_LAYOUT = xkb.layout;
+              XKB_DEFAULT_OPTIONS = xkb.options;
+              XKB_DEFAULT_VARIANT = xkb.variant;
+            })
+          ];
         };
 
         # - send a signal to the daemon once /sysroot was mounted so it may pivot
@@ -181,7 +242,9 @@ in {
       availableKernelModules = ["evdev" "overlay"]; # - required for input / etc.
 
       #Configure the closure of things that are compressed / optionally sideloaded (handled in ./squashed-closure.nix)
-      luks.sddmUnlock.closureContents = [glibcLocales cfg.packages.mesa-minimal cfg.packages.sddm-daemon elgfsKmsConfig sddmConfig];
+      luks.sddmUnlock.closureContents =
+        [glibcLocales cfg.packages.sddm-daemon kmsConfig sddmConfig]
+        ++ (lib.optional (!cfg.theme.qtSwRendering) cfg.packages.mesa-minimal);
 
       #Configure infinite retries for all devices we should unlock
       luks.devices = lib.genAttrs cfg.luksDevices (_: {crypttabExtraOpts = ["tries=0"];});

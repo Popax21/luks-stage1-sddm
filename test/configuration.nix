@@ -156,6 +156,9 @@
       luksDevices = ["test-drive"];
       sideloadClosure = false; # true; # - expensive to test!
 
+      displayOutputs."Virtual1".mode = "1920x1080";
+      displayDpi = 144; # - 150%
+
       theme.name = "breeze";
       theme.packages = [pkgs.kdePackages.plasma-desktop];
     };

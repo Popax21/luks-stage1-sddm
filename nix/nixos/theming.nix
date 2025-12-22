@@ -20,17 +20,15 @@
       defaultText = lib.literalExpression "config.services.displayManager.sddm.extraPackages";
     };
 
-    envVars = lib.mkOption {
-      type = lib.types.attrsOf lib.types.str;
-      description = "Environment variables to set for the SDDM greeter process.";
-      default = {};
-      example = ''
-        {
-          QT_QPA_SYSTEM_ICON_THEME = "breeze";
-        }
+    qtSwRendering = lib.mkOption {
+      type = lib.types.bool;
+      description = ''
+        Use Qt Quick's software rendering backend instead of a OpenGL ES / Mesa3D llvmpipe-backed renderer.
+        Can reduce the SDDM closure size, but may result in reduced graphical fidelity.
+        Does not support multiple monitors, and will always render to a single output (which may be selected using `QT_QPA_EGLFS_KMS_CONNECTOR_INDEX`).
       '';
+      default = false;
     };
-
     qt5Compat = lib.mkOption {
       type = lib.types.bool;
       description = "Whether to enable support for the `Qt5Compat` QML modules within the SDDM theme environment.";
@@ -43,6 +41,17 @@
       example = ''
         {
           "org.kde.ksvg" = pkgs.luks-stag1-sddm.kde-minimal.ksvg;
+        }
+      '';
+    };
+
+    envVars = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      description = "Environment variables to set for the SDDM greeter process.";
+      default = {};
+      example = ''
+        {
+          QT_QPA_SYSTEM_ICON_THEME = "breeze";
         }
       '';
     };
