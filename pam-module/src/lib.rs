@@ -1,6 +1,6 @@
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
-use nonstick::{ModuleClient, PamModule, items::ItemsMut, pam_export};
+use nonstick::{ConversationAdapter, ModuleClient, PamModule, items::ItemsMut, pam_export};
 use zeroize::Zeroizing;
 
 struct SddmInitrdAutologin;
@@ -93,6 +93,85 @@ impl<M: ModuleClient> PamModule<M> for SddmInitrdAutologin {
             handle,
             "handing off initrd LUKS unlock login request for user {user:?}"
         );
+
+        Ok(())
+    }
+
+    fn change_authtok(
+        handle: &mut M,
+        args: Vec<&std::ffi::CStr>,
+        action: nonstick::AuthtokAction,
+        flags: nonstick::AuthtokFlags,
+    ) -> nonstick::Result<()> {
+        if action != nonstick::AuthtokAction::Update
+            || flags.contains(nonstick::AuthtokFlags::CHANGE_EXPIRED_AUTHTOK)
+        {
+            return Ok(());
+        }
+
+        let user = handle.username(None)?;
+        let old_authtok = handle.old_authtok(None)?;
+        let new_authtok = handle.authtok(None)?;
+
+        //Check that this is a user whose password we are managing
+        'user_ok: {
+            for &arg in &args {
+                let arg = arg.to_str().map_err(|_| nonstick::ErrorCode::BufferError)?;
+                if arg.strip_prefix("user=").is_some_and(|u| u == user) {
+                    break 'user_ok;
+                }
+            }
+            return Ok(());
+        };
+
+        //Change LUKS keys of all devices
+        for &arg in &args {
+            let arg = arg.to_str().map_err(|_| nonstick::ErrorCode::BufferError)?;
+            let Some(device) = arg.strip_prefix("luksDevice=") else {
+                continue;
+            };
+
+            use std::io::Write;
+
+            let (reader, mut writer) = std::io::pipe().unwrap();
+            writer.write_all(old_authtok.as_encoded_bytes()).unwrap();
+            writer.write_all(b"\n").unwrap();
+            writer.write_all(new_authtok.as_encoded_bytes()).unwrap();
+            writer.write_all(b"\n").unwrap();
+
+            handle.info_msg(format!("Changing LUKS password of {device:?}"));
+
+            let desync_warning = || {
+                handle.error_msg(" - failed to change LUKS password (check syslog); the LUKS and user passwords might have desynced!")
+            };
+
+            match std::process::Command::new(
+                std::option_env!("CRYPTSETUP_EXE").unwrap_or("cryptsetup"),
+            )
+            .arg("luksChangeKey")
+            .arg(device)
+            .stdin(reader)
+            .status()
+            {
+                Ok(status) if status.success() => {
+                    nonstick::info!(handle, "changed LUKS password of {device:?}");
+                }
+                Ok(status) => {
+                    nonstick::error!(
+                        handle,
+                        "failed to change LUKS password for {device:?}: cryptsetup exited with {status}"
+                    );
+                    desync_warning();
+                }
+                Err(err) => {
+                    nonstick::error!(
+                        handle,
+                        "failed to change LUKS password for {device:?}: {err}"
+                    );
+                    desync_warning();
+                }
+            }
+        }
 
         Ok(())
     }

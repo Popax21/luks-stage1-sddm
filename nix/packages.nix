@@ -38,8 +38,10 @@ pkgs.lib.makeScope pkgs.newScope (self: {
 
   luks-stage1-sddm = self.callPackage (
     {
+      lib,
       craneLib,
       cargoArtifacts,
+      cryptsetup,
       pam,
     }: let
       pkg = craneLib.buildPackage {
@@ -49,6 +51,8 @@ pkgs.lib.makeScope pkgs.newScope (self: {
 
         RUSTFLAGS = "-C link-args=-L${pam}/lib";
         TRANSIENT_SDDM_CONF = "/run/sddm-initrd-lucks-unlock.conf";
+
+        CRYPTSETUP_EXE = lib.getExe cryptsetup;
       };
     in
       pkg

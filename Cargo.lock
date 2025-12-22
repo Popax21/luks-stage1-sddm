@@ -534,6 +534,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd945864f07fe9f5371a27ad7b52a172b4b499999f1d97574c9fa68373937e12"
 
 [[package]]
+name = "luks-stage1-pam"
+version = "0.1.0"
+dependencies = [
+ "linux-keyutils",
+ "nonstick",
+ "rust-ini",
+ "zeroize",
+]
+
+[[package]]
 name = "luks-stage1-sddm-daemon"
 version = "0.1.0"
 dependencies = [
@@ -549,16 +559,6 @@ dependencies = [
  "serde",
  "smol",
  "zbus",
- "zeroize",
-]
-
-[[package]]
-name = "luks-stage1-sddm-pam-handoff"
-version = "0.1.0"
-dependencies = [
- "linux-keyutils",
- "nonstick",
- "rust-ini",
  "zeroize",
 ]
 

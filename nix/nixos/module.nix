@@ -80,6 +80,12 @@ in {
       '';
     };
 
+    syncPasswordChanges = lib.mkOption {
+      type = lib.types.bool;
+      description = "Change the LUKS password when the password of an early-logon user gets changed.";
+      default = true;
+    };
+
     displayOutputs = lib.mkOption {
       type = lib.types.attrsOf (lib.types.submodule {
         options = {
@@ -248,5 +254,18 @@ in {
       #Configure infinite retries for all devices we should unlock
       luks.devices = lib.genAttrs cfg.luksDevices (_: {crypttabExtraOpts = ["tries=0"];});
     };
+
+    #Sync password changes (if enabled)
+    security.pam.services = lib.mkIf cfg.syncPasswordChanges (lib.genAttrs ["login" "passwd" "chpasswd"] (srv: {
+      rules.password.luks-password-sync = {
+        control = "optional";
+        modulePath = "${cfg.packages.luks-stage1-sddm}/lib/libluks_stage1_pam.so";
+        args = lib.concatLists [
+          (map (u: "user=${u}") cfg.users)
+          (map (d: "luksDevice=${config.boot.initrd.luks.devices.${d}.device}") cfg.luksDevices)
+        ];
+        order = config.security.pam.services.${srv}.rules.password.unix.order - 10;
+      };
+    }));
   };
 }

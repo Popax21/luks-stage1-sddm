@@ -1,5 +1,5 @@
 [package]
-name = "luks-stage1-sddm-pam-handoff"
+name = "luks-stage1-pam"
 version.workspace = true
 edition.workspace = true
 
