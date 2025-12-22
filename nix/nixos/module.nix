@@ -215,7 +215,7 @@ in {
 
           after = ["luks-sddm.service" "initrd-nixos-activation.service"];
           before = ["initrd-switch-root.service"];
-          bindsTo = ["luks-sddm.service"];
+          requisite = ["luks-sddm.service"];
           wantedBy = ["initrd-switch-root.target"];
           unitConfig.DefaultDependencies = false;
 
@@ -242,6 +242,7 @@ in {
         overlay = true;
       };
 
+      kernelModules = ["loop"];
       availableKernelModules = ["evdev" "overlay"]; # - required for input / etc.
 
       #Configure the closure of things that are compressed / optionally sideloaded (handled in ./squashed-closure.nix)

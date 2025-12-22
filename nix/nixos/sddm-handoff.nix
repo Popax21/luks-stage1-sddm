@@ -26,8 +26,8 @@ in {
       # - reclaim the cgroup, otherwise we get sent a SIGTERM from the stage2 systemd manager
       luks-sddm = {
         wantedBy = ["graphical.target"]; # - if we're not booting into graphical.target, we still want to get sent a SIGTERM
-        unitConfig.Type = "forking";
         unitConfig.DefaultDependencies = false;
+        serviceConfig.Type = "forking";
         script = "exit";
       };
 
