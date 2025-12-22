@@ -259,6 +259,7 @@ in {
         control = "optional";
         modulePath = "${cfg.packages.luks-stage1-sddm}/lib/libluks_stage1_pam.so";
         args = lib.concatLists [
+          ["cryptsetup=${lib.getExe pkgs.cryptsetup}"]
           (map (u: "user=${u}") cfg.users)
           (map (d: "luksDevice=${config.boot.initrd.luks.devices.${d}.device}") cfg.luksDevices)
         ];

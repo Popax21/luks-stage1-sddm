@@ -124,6 +124,15 @@ impl<M: ModuleClient> PamModule<M> for SddmInitrdAutologin {
             return Ok(());
         };
 
+        //Find the cryptsetup binary
+        let mut cryptsetup = "cryptsetup";
+        for &arg in &args {
+            let arg = arg.to_str().map_err(|_| nonstick::ErrorCode::BufferError)?;
+            if let Some(exe) = arg.strip_prefix("cryptsetup=") {
+                cryptsetup = exe;
+            }
+        }
+
         //Change LUKS keys of all devices
         for &arg in &args {
             let arg = arg.to_str().map_err(|_| nonstick::ErrorCode::BufferError)?;
@@ -142,16 +151,14 @@ impl<M: ModuleClient> PamModule<M> for SddmInitrdAutologin {
             handle.info_msg(format!("Changing LUKS password of {device:?}"));
 
             let desync_warning = || {
-                handle.error_msg(" - failed to change LUKS password (check syslog); the LUKS and user passwords might have desynced!")
+                handle.error_msg("Failed to change LUKS password (check syslog) - the LUKS and user passwords might have desynced!")
             };
 
-            match std::process::Command::new(
-                std::option_env!("CRYPTSETUP_EXE").unwrap_or("cryptsetup"),
-            )
-            .arg("luksChangeKey")
-            .arg(device)
-            .stdin(reader)
-            .status()
+            match std::process::Command::new(cryptsetup)
+                .arg("luksChangeKey")
+                .arg(device)
+                .stdin(reader)
+                .status()
             {
                 Ok(status) if status.success() => {
                     nonstick::info!(handle, "changed LUKS password of {device:?}");
