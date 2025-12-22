@@ -183,7 +183,7 @@ in {
         lib.mkForce (pkgs.writeShellScript "install-bootloader-hooked" ''
           ${buildVal.installBootLoader} "$@"
           echo "Installing squashed SDDM initrd closure for graphical LUKS unlock"
-          cp ${squashedClosure} "${efiDir}/${squashedClosurePath}"
+          ${lib.getExe' pkgs.coreutils "cp"} ${squashedClosure} "${efiDir}/${squashedClosurePath}"
         '')
     );
 
