@@ -177,7 +177,7 @@ in {
     system.build.installBootLoader = lib.mkIf cfg.sideloadClosure (
       let
         buildOpt = options.system.build;
-        buildDefs = builtins.filter (d: d.file != (toString ./module.nix)) buildOpt.definitionsWithLocations;
+        buildDefs = builtins.filter (d: d.file != (toString ./squashed-closure.nix)) buildOpt.definitionsWithLocations;
         buildVal = buildOpt.type.merge buildOpt.loc buildDefs;
       in
         lib.mkForce (pkgs.writeShellScript "install-bootloader-hooked" ''
