@@ -20,6 +20,12 @@
       defaultText = lib.literalExpression "config.services.displayManager.sddm.extraPackages";
     };
 
+    syncUserAvatars = lib.mkOption {
+      type = lib.types.bool;
+      description = "Whether to copy user avatars into the initrd using the initrd secrets mechanism to be shown by the stage 1 SDDM greeter.";
+      default = config.boot.loader.supportsInitrdSecrets;
+    };
+
     qtSwRendering = lib.mkOption {
       type = lib.types.bool;
       description = ''
@@ -155,5 +161,8 @@
       closureContents = qtPkgs;
       closureBuildDeps = [cfg.theme.themeEnv.raw] ++ (lib.attrValues cfg.theme.qmlModules);
     };
+
+    #Copy user avatars (if enabled)
+    boot.initrd.secrets = lib.mkIf cfg.theme.syncUserAvatars (lib.genAttrs' cfg.users (u: lib.nameValuePair "/var/lib/AccountsService/users/${u}" null));
   };
 }
