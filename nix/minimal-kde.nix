@@ -81,4 +81,11 @@ in
       outputs = ["out"];
       dontWrapQtApps = true;
     };
+
+    itinerary = null;
+    kajongg = null;
+    kapidox = null;
+    libquotient = null;
+    rocs = null;
+    umbrello = null;
   })

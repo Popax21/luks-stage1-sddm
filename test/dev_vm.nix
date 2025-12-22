@@ -14,10 +14,12 @@
 in {
   type = "app";
   program = "${vm}/bin/run-nixos-vm";
-  meta.description = "Development VM";
+  meta = {
+    description = "Development VM";
 
-  inherit config;
-  roots = nixpkgs.legacyPackages.${system}.runCommandLocal "luks-stage1-sddm-dev-vm-roots" {} (
-    nixpkgs.lib.concatLines (map (r: "echo ${r} >> $out") config.config.boot.initrd.luks.sddmUnlock.closureBuildDeps)
-  );
+    inherit config;
+    roots = nixpkgs.legacyPackages.${system}.runCommandLocal "luks-stage1-sddm-dev-vm-roots" {} (
+      nixpkgs.lib.concatLines (map (r: "echo ${r} >> $out") config.config.boot.initrd.luks.sddmUnlock.closureBuildDeps)
+    );
+  };
 }

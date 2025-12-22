@@ -147,4 +147,6 @@
         # "quicktemplates2_container" # - can't be disabled because of a Qt bug :/
       ]);
   });
+
+  qttranslations = null;
 })
