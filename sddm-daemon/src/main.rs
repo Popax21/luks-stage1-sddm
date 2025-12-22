@@ -100,6 +100,15 @@ fn main() -> ExitCode {
             controller.clone(),
         ));
 
+        //Wait for a DRI/DRM device to become available
+        if !wait_for_dri_device()
+            .await
+            .expect("failed to wait for DRI/DRM device")
+        {
+            eprintln!("no DRI/DRM device became available");
+            return ExitCode::FAILURE;
+        }
+
         //Start the SDDM greeter
         let mut greeter = {
             let mut cmd = Command::new(&controller.sddm_config.greeter);
@@ -210,4 +219,35 @@ fn claim_tty() -> std::io::Result<std::fs::File> {
     nix::sys::termios::tcsetattr(&tty, nix::sys::termios::SetArg::TCSANOW, &termios)?;
 
     Ok(tty)
+}
+
+async fn wait_for_dri_device() -> std::io::Result<bool> {
+    let mut spin_attempt = 0;
+    loop {
+        //Check for a DRI device
+        if std::fs::exists("/dev/dri")? {
+            for ent in std::fs::read_dir("/dev/dri")? {
+                if ent?
+                    .file_name()
+                    .to_str()
+                    .is_some_and(|n| n.starts_with("card"))
+                {
+                    return Ok(true);
+                }
+            }
+        }
+
+        //No DRI device - wait for a bit, but give up if it takes too long
+        if spin_attempt == 1 {
+            eprintln!("no DRI/DRM device available - spinning for a while...");
+        }
+
+        spin_attempt += 1;
+
+        if spin_attempt > 30 {
+            return Ok(false);
+        }
+
+        smol::Timer::after(std::time::Duration::from_millis(200)).await;
+    }
 }
