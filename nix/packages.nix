@@ -22,7 +22,7 @@ pkgs.lib.makeScope pkgs.newScope (self: {
   libglvnd = pkgs.libglvnd.overrideAttrs (old: {
     # - disable GLX to remove X11 dependencies
     buildInputs = [];
-    configureFlags = old.configureFlags ++ ["--disable-x11" "--disable-gles1" "--disable-gles2"];
+    configureFlags = old.configureFlags ++ ["--disable-x11" "--disable-gles1"];
   });
 
   craneLib = crane self;

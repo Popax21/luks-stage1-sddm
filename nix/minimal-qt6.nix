@@ -27,10 +27,7 @@
     pname = "qtbase-minimal";
     inherit (qt6.srcs.qtbase) version src;
 
-    patches = qt6.qtbase.patches ++ [
-      patches/qtbase-linuxfb-platform-theme.patch
-      patches/qtbase-eglfs-kms-desktop-gl.patch
-    ];
+    patches = qt6.qtbase.patches ++ [patches/qtbase-linuxfb-platform-theme.patch];
 
     strictDeps = true;
     enableParallelBuilding = true;
@@ -82,7 +79,7 @@
       "-DFEATURE_libinput=ON"
       "-DFEATURE_eglfs=ON"
       "-DFEATURE_eglfs_gbm=ON"
-      "-DINPUT_opengl=desktop"
+      "-DINPUT_opengl=es2"
 
       "-DQT_SKIP_AUTO_PLUGIN_INCLUSION=ON"
       "-DQT_QPA_PLATFORMS=linuxfb;eglfs"

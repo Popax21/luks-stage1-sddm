@@ -15,16 +15,16 @@
   mesa,
 }:
 stdenv.mkDerivation {
-  name = "mesa-minimal";
+  pname = "mesa-minimal";
   inherit (mesa) version src;
 
   mesonAutoFeatures = "disabled";
   mesonFlags = [
     "--sysconfdir=/etc"
 
-    (lib.mesonBool "opengl" true)
+    (lib.mesonBool "opengl" false)
     (lib.mesonEnable "gles1" false)
-    (lib.mesonEnable "gles2" false)
+    (lib.mesonEnable "gles2" true)
     (lib.mesonEnable "egl" true)
     (lib.mesonEnable "glx" false)
 
