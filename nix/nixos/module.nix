@@ -13,7 +13,6 @@
   };
 
   kmsConfig = pkgs.writeText "initrd-kms-config.json" (builtins.toJSON {
-    hwcursor = !cfg.theme.qtSwRendering;
     outputs =
       lib.mapAttrsToList (name: cfg: (lib.filterAttrs (_: v: v != null) {
         inherit name;

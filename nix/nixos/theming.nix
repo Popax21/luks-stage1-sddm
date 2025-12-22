@@ -3,7 +3,20 @@
   lib,
   pkgs,
   ...
-}: {
+}: let
+  cfg = config.boot.initrd.luks.sddmUnlock;
+
+  qt6-minimal = cfg.packages.qt6-minimal;
+  qtPkgs = [qt6-minimal.qtdeclarative qt6-minimal.qtsvg] ++ (lib.optional cfg.theme.qt5Compat qt6-minimal.qt5compat);
+
+  cursorAtlas =
+    if cfg.theme.cursorIcons != null
+    then
+      pkgs.runCommand "initrd-sddm-cursor-atlas" {
+        nativeBuildInputs = [(pkgs.python3.withPackages (ps: [ps.pillow])) pkgs.xcur2png];
+      } "python3 ${./build-cursor-atlas.py} ${cfg.theme.themeEnv.rawEnv} ${cfg.theme.cursorIcons} ${toString cfg.theme.cursorSize}"
+    else null;
+in {
   imports = [./breeze-fixups.nix];
 
   options.boot.initrd.luks.sddmUnlock.theme = {
@@ -18,6 +31,17 @@
       description = "Extra SDDM themes / Qt plugins / QML libraries to add to the initrd environment.";
       default = config.services.displayManager.sddm.extraPackages;
       defaultText = lib.literalExpression "config.services.displayManager.sddm.extraPackages";
+    };
+
+    cursorIcons = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      description = "The icon set to use for the mouse cursor, or `null` for the default Qt cursors.";
+      default = null;
+    };
+    cursorSize = lib.mkOption {
+      type = lib.types.int;
+      description = "The size of cursor to use in pixels.";
+      default = builtins.ceil (32 * (cfg.displayDpi / 96.0));
     };
 
     syncUserAvatars = lib.mkOption {
@@ -97,12 +121,7 @@
     };
   };
 
-  config = let
-    cfg = config.boot.initrd.luks.sddmUnlock;
-
-    qt6-minimal = cfg.packages.qt6-minimal;
-    qtPkgs = [qt6-minimal.qtdeclarative qt6-minimal.qtsvg] ++ (lib.optional cfg.theme.qt5Compat qt6-minimal.qt5compat);
-  in {
+  config = {
     #Build a theme environment containing the SDDM theme and all its referenced Qt QML modules
     boot.initrd.luks.sddmUnlock.theme = {
       themeEnv = pkgs.runCommand "initrd-sddm-theme-env" rec {
@@ -120,6 +139,7 @@
               "/lib/qt-6"
               "/share/sddm/themes/${cfg.theme.name}"
             ]
+            ++ (lib.optional (cfg.theme.cursorIcons != null) "/share/icons/${cfg.theme.cursorIcons}")
             ++ cfg.theme.extraPaths;
         };
         passthru.raw = rawEnv;
@@ -137,6 +157,7 @@
         [
           "!${cfg.theme.themeEnv}/lib/qt-6/"
         ]
+        ++ (lib.optional (cfg.theme.cursorIcons != null) "!${cursorAtlas}/")
         ++ (
           map (p: "!${cfg.theme.themeEnv}/${
             if lib.hasPrefix "/" p
@@ -145,6 +166,8 @@
           }/")
           cfg.theme.extraPaths
         );
+
+      envVars.QT_QPA_EGLFS_CURSOR = lib.mkIf (cursorAtlas != null) "${cursorAtlas}/config.json";
     };
 
     #Hook up theme Qt modules / plugins
@@ -158,7 +181,7 @@
       };
 
     boot.initrd.luks.sddmUnlock = {
-      closureContents = qtPkgs;
+      closureContents = qtPkgs ++ (lib.optional (cursorAtlas != null) cursorAtlas);
       closureBuildDeps = [cfg.theme.themeEnv.raw] ++ (lib.attrValues cfg.theme.qmlModules);
     };
 

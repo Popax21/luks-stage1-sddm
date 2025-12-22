@@ -35,8 +35,8 @@ in
       patches = (old.patches or []) ++ [patches/kiconthemes-minimal.patch];
       cmakeFlags = (old.cmakeFlags or []) ++ ["-DUSE_DBUS=OFF" "-DKICONTHEMES_USE_QTQUICK=OFF"];
 
-      buildInputs = with final; [qt6-minimal.qtsvg karchive ksvg kcolorscheme breeze-icons];
-      nativeBuildInputs = [cmake ninja final.extra-cmake-modules];
+      buildInputs = with final; [extra-cmake-modules qtsvg karchive ksvg kcolorscheme breeze-icons];
+      nativeBuildInputs = [cmake ninja];
       propagatedBuildInputs = [];
 
       outputs = ["out"];
@@ -45,13 +45,24 @@ in
     breeze-icons = prev.breeze-icons.overrideAttrs (old: {
       cmakeFlags = (old.cmakeFlags or []) ++ ["-DSKIP_INSTALL_ICONS=ON"];
     });
+    breeze-cursors = final.breeze.overrideAttrs (old: {
+      cmakeFlags = (old.cmakeFlags or []) ++ ["-DBUILD_QT5=OFF" "-DBUILD_QT6=OFF" "-DBUILD_TESTING=OFF"];
+      postInstall = "";
+
+      buildInputs = with final; [extra-cmake-modules qtbase];
+      nativeBuildInputs = [cmake ninja];
+      propagatedBuildInputs = [];
+
+      outputs = ["out"];
+      dontWrapQtApps = true;
+    });
 
     libplasma = prev.libplasma.overrideAttrs (old: {
       patches = (old.patches or []) ++ [patches/libplasma-minimal.patch];
       cmakeFlags = (old.cmakeFlags or []) ++ ["-DUSE_DBUS=OFF"];
 
-      buildInputs = with final; [qt6-minimal.qtdeclarative kconfig kcoreaddons kguiaddons ki18n kiconthemes kirigami ksvg kcolorscheme];
-      nativeBuildInputs = [cmake ninja final.extra-cmake-modules];
+      buildInputs = with final; [extra-cmake-modules qtdeclarative kconfig kcoreaddons kguiaddons ki18n kiconthemes kirigami ksvg kcolorscheme];
+      nativeBuildInputs = [cmake ninja];
       propagatedBuildInputs = [];
 
       outputs = ["out"];
@@ -63,8 +74,8 @@ in
       postInstall = "";
       postFixup = "";
 
-      buildInputs = [qt6-minimal.qtdeclarative final.kguiaddons];
-      nativeBuildInputs = [cmake ninja final.extra-cmake-modules];
+      buildInputs = with final; [extra-cmake-modules qtdeclarative kguiaddons];
+      nativeBuildInputs = [cmake ninja];
       propagatedBuildInputs = [];
 
       outputs = ["out"];
