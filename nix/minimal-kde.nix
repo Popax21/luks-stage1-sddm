@@ -2,6 +2,7 @@
   stdenv,
   cmake,
   ninja,
+  gettext,
   kdePackages,
   qt6-minimal,
   qt6Packages,
@@ -89,6 +90,7 @@ in
       srcs = [final.plasma-desktop.src final.breeze.src];
       sourceRoot = "plasma-desktop-${final.plasma-desktop.version}";
 
+      nativeBuildInputs = [gettext];
       propagatedBuildInputs = [final.libplasma final.plasma-workspace];
 
       buildPhase = ''
@@ -96,6 +98,12 @@ in
         mv sddm-theme/theme.conf.cmake sddm-theme/theme.conf
         sed -i 's|''${KDE_INSTALL_FULL_DATADIR}|'"$out"'|' sddm-theme/theme.conf
         sed -i 's|''${KDE_INSTALL_FULL_WALLPAPERDIR}|'"$out"'/share/wallpapers|' sddm-theme/theme.conf
+
+        for lang in $(ls po); do
+          export lang
+          mkdir -p $out/share/locale/$lang/LC_MESSAGES
+          find po/$lang -name '*.po' -exec sh -c 'msgfmt -o $out/share/locale/$lang/LC_MESSAGES/$(basename "{}" .po).mo {}' \;
+        done
 
         mkdir -p $out/share/sddm/themes
         cp -r sddm-theme $out/share/sddm/themes/breeze
