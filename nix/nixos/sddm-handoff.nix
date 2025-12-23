@@ -35,6 +35,7 @@ in {
         wantedBy = ["graphical.target"]; # - if we're not booting into graphical.target, we still want to get sent a SIGTERM
         unitConfig.DefaultDependencies = false;
         serviceConfig.Type = "forking";
+        serviceConfig.KillMode = "mixed";
         script = "exit";
       };
 

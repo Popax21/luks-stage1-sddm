@@ -162,7 +162,7 @@ fn main() -> ExitCode {
         //Shutdown password request handling
         pw_req_handler.cancel().await;
 
-        if let Some(request) = controller.shutdown().await {
+        if failsafe_engaged && let Some(request) = controller.shutdown().await {
             //We got a pending login request before shutting down; prepare for a handoff to the proper SDDM service
             if sysroot_pivot_task.is_finished() {
                 write_transient_sddm_config(&request)
