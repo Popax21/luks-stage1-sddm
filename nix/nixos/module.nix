@@ -14,6 +14,7 @@
 
   kmsConfig = pkgs.writeText "initrd-kms-config.json" (builtins.toJSON {
     device = cfg.driDevice;
+    hwcursor = cfg.theme.cursorHwAcceleration;
     outputs =
       lib.mapAttrsToList (name: cfg: (lib.filterAttrs (_: v: v != null) {
         inherit name;

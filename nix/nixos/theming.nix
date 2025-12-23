@@ -102,6 +102,11 @@ in {
       description = "The size of cursor to use in pixels.";
       default = builtins.ceil (32 * (cfg.displayDpi / 96.0));
     };
+    cursorHwAcceleration = lib.mkOption {
+      type = lib.types.bool;
+      description = "Whether or not to use hardware-accelerated for drawing the greeter cursor.";
+      default = true;
+    };
 
     qtSwRendering = lib.mkOption {
       type = lib.types.bool;

@@ -179,6 +179,72 @@ null or string
 
 
 
+## boot\.initrd\.luks\.sddmUnlock\.extraClosureRules
+
+
+
+Extra exclusion rules to apply when building the SDDM initrd closure\.
+
+
+
+*Type:*
+list of string
+
+
+
+*Default:*
+` [ ] `
+
+
+
+*Example:*
+
+```
+[
+  "${somePkg}/excludeFile"
+  "!${somePkg}/includeFile"
+
+  "${somePkg}/excludeFolder/"
+  "!${somePkg}/includeFolder/"
+]
+```
+
+*Declared by:*
+ - [nix/nixos/squashed-closure\.nix](nix/nixos/squashed-closure.nix)
+
+
+
+## boot\.initrd\.luks\.sddmUnlock\.kmsModules
+
+
+
+Kernel modules to use for enabling KMS support\. These kernel modules will be stored in the squashed closure\.
+
+
+
+*Type:*
+list of string
+
+
+
+*Default:*
+` [ ] `
+
+
+
+*Example:*
+
+```
+[
+  "amdgpu"
+]
+```
+
+*Declared by:*
+ - [nix/nixos/module\.nix](nix/nixos/module.nix)
+
+
+
 ## boot\.initrd\.luks\.sddmUnlock\.locale
 
 
@@ -367,6 +433,27 @@ boolean
 
 
 
+## boot\.initrd\.luks\.sddmUnlock\.theme\.cursorHwAcceleration
+
+
+
+Whether or not to use hardware-accelerated for drawing the greeter cursor\.
+
+
+
+*Type:*
+boolean
+
+
+
+*Default:*
+` true `
+
+*Declared by:*
+ - [nix/nixos/theming\.nix](nix/nixos/theming.nix)
+
+
+
 ## boot\.initrd\.luks\.sddmUnlock\.theme\.cursorIcons
 
 
@@ -475,41 +562,6 @@ attribute set of string
 {
   QT_QPA_SYSTEM_ICON_THEME = "breeze";
 }
-```
-
-*Declared by:*
- - [nix/nixos/theming\.nix](nix/nixos/theming.nix)
-
-
-
-## boot\.initrd\.luks\.sddmUnlock\.theme\.extraClosureRules
-
-
-
-Extra exclusion rules to apply when building the initrd closure\.
-
-
-
-*Type:*
-list of string
-
-
-
-*Default:*
-` [ ] `
-
-
-
-*Example:*
-
-```
-[
-  "${somePkg}/excludeFile"
-  "!${somePkg}/includeFile"
-
-  "${somePkg}/excludeFolder/"
-  "!${somePkg}/includeFolder/"
-]
 ```
 
 *Declared by:*
