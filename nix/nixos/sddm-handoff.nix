@@ -10,6 +10,13 @@
   sddmEnable' = lib.warnIfNot sddmEnable "Graphical LUKS unlocking using SDDM in initrd is enabled, but SDDM itself is disabled" sddmEnable;
 in {
   config = lib.mkIf (cfg.enable && sddmEnable') {
+    warnings = lib.mkIf (config.security.pam.services.login.fprintAuth) [
+      ''
+        Fingerprint login is enabled, which will conflict with luks-stage1-sddm.
+        Consider switching to just fingerprint unlocking by setting `security.pam.services.login.fprintAuth = false;`.
+      ''
+    ];
+
     #Create a symlink in /etc/sddm.conf.d which points to our ephemerally generated SDDM config file
     environment.etc."sddm.conf.d/initrd-luks-unlock.conf".source = toString (
       pkgs.runCommandLocal "sddm-initrd-luks-unlock-link" {} "ln -s ${cfg.packages.luks-stage1-sddm.TRANSIENT_SDDM_CONF} $out"
