@@ -33,3 +33,12 @@ As such there should be no circumstances where usage of this module results in y
 ## Configuration options
 
 See [here](MODULE_OPTIONS.md).
+
+
+## TODO
+
+ - as of right now, multi-monitor support is very screwy at best
+   - support for Qt6 eglfs's native "virtual desktop" is exposed, however from some preliminary testing said virtual desktop completely breaks input field focusing, has wonky mouse cursor clamping behavior, and seemingly even causes the theme to fail to load properly
+   - additionally, nice-to-haves like different DPIs per screen are fundamentally incompatible with its architecture
+   - this might be addressed by shipping a minimal Wayland compositor in the SDDM closure to properly support multi-monitor scenarios (maybe automatically sourcing monitor configuration data from `kwinoutputconfig.json` as well)
+ - the closure size could be reduced even further by stripping unreferenced dynamic libraries from the closure
