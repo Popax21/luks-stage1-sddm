@@ -9,6 +9,7 @@ boot.initrd.luks.sddmUnlock = {
     enable = true;
     users = ["yourUser"];
     luksDevices = ["yourDriveLabel"];
+    kmsModules = ["amdgpu"]; # - or ["nvidia_drm"]
 };
 ```
 

@@ -26,6 +26,25 @@
       cfg.displayOutputs;
   });
 
+  kmsModuleClosure =
+    if cfg.kmsModules != []
+    then
+      (pkgs.makeModulesClosure {
+        rootModules = cfg.kmsModules;
+        kernel = config.system.modulesTree;
+        firmware = config.hardware.firmware;
+        allowMissing = config.boot.initrd.allowMissingModules;
+        inherit (config.boot.initrd) extraFirmwarePaths;
+      }).overrideAttrs (old: {
+        builder = pkgs.writeShellScript "initrd-kms-module-closure-builder" ''
+          source ${old.builder}
+
+          # export CLOSURE=${config.system.build.modulesClosure}
+          # find $CLOSURE -path '**/kernel/**' -type f -exec sh -c 'rm $out/$(realpath --relative-to=$CLOSURE {})' \;
+        '';
+      })
+    else null;
+
   defaultConfig =
     {
       LUKSUnlock.Greeter = lib.getExe' cfg.packages.sddm-minimal "sddm-greeter-qt6";
@@ -85,6 +104,13 @@ in {
       type = lib.types.bool;
       description = "Change the LUKS password when the password of an early-logon user gets changed.";
       default = true;
+    };
+
+    kmsModules = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      description = "Kernel modules to use for enabling KMS support. These kernel modules will be stored in the squashed closure.";
+      default = [];
+      example = ["amdgpu"];
     };
 
     displayOutputs = lib.mkOption {
@@ -171,6 +197,17 @@ in {
           unitConfig.StartLimitBurst = 1;
           unitConfig.StartLimitIntervalSec = "infinity";
 
+          # - load all KMS kernel modules before startup
+          preStart = lib.mkIf (kmsModuleClosure != null) ''
+            mkdir -p /tmp/kms-modules/lib
+            mount -t overlay overlay -o lowerdir=${kmsModuleClosure}/lib:/lib /tmp/kms-modules/lib
+            ${lib.concatLines (map (m: ''
+                echo "loading KMS module ${m}..."
+                modprobe -d /tmp/kms-modules ${m}
+              '')
+              cfg.kmsModules)}
+          '';
+
           # - if we fail, refresh the system's fbcon
           postStop = ''
             if [ "$SERVICE_RESULT" != "success" ]; then
@@ -253,9 +290,14 @@ in {
       availableKernelModules = ["evdev" "overlay"]; # - required for input / etc.
 
       #Configure the closure of things that are compressed / optionally sideloaded (handled in ./squashed-closure.nix)
-      luks.sddmUnlock.closureContents =
-        [glibcLocales cfg.packages.sddm-daemon kmsConfig sddmConfig]
-        ++ (lib.optional (!cfg.theme.qtSwRendering) cfg.packages.mesa-minimal);
+      luks.sddmUnlock = {
+        closureContents =
+          [glibcLocales cfg.packages.sddm-daemon kmsConfig sddmConfig]
+          ++ (lib.optional (kmsModuleClosure != null) kmsModuleClosure)
+          ++ (lib.optional (!cfg.theme.qtSwRendering) cfg.packages.mesa-minimal);
+
+        extraClosureRules = lib.optional (kmsModuleClosure != null) "!${kmsModuleClosure}/";
+      };
 
       #Configure infinite retries for all devices we should unlock
       luks.devices = lib.genAttrs cfg.luksDevices (_: {crypttabExtraOpts = ["tries=0"];});

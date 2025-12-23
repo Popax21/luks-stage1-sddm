@@ -59,7 +59,7 @@
         "!${matchPkg "luks-stage1-sddm"}/bin/luks-stage1-sddm-daemon"
         "!${matchPkg "sddm-minimal"}/bin/sddm-greeter-qt6"
       ]
-      ++ cfg.theme.extraClosureRules;
+      ++ cfg.extraClosureRules;
   } "python3 ${./build-closure.py}";
 
   efiDir = config.boot.loader.efi.efiSysMountPoint;
@@ -89,6 +89,21 @@ in {
         Don't store the squashed SDDM closure in the initrd itself, and instead store it directly on the EFI partition.
         This can be used to reduce the size of the generated initrd.
       '';
+    };
+
+    extraClosureRules = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      description = "Extra exclusion rules to apply when building the SDDM initrd closure.";
+      default = [];
+      example = lib.literalExpression (lib.trim ''
+        [
+          "''${somePkg}/excludeFile"
+          "!''${somePkg}/includeFile"
+
+          "''${somePkg}/excludeFolder/"
+          "!''${somePkg}/includeFolder/"
+        ]
+      '');
     };
 
     closureContents = lib.mkOption {
@@ -160,7 +175,7 @@ in {
 
       #Mount the squashed closure before startup
       services.luks-sddm = {
-        preStart = ''
+        preStart = lib.mkBefore ''
           mkdir -p /tmp/luks-sddm-closure
           mount -t squashfs -o loop ${lib.escapeShellArg squashedClosurePath} /tmp/luks-sddm-closure
           mount -t overlay overlay -o lowerdir=${builtins.storeDir}:/tmp/luks-sddm-closure${builtins.storeDir} ${builtins.storeDir}

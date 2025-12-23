@@ -146,20 +146,6 @@ in {
         "/share/icons/breeze"
       ];
     };
-    extraClosureRules = lib.mkOption {
-      type = lib.types.listOf lib.types.str;
-      description = "Extra exclusion rules to apply when building the initrd closure.";
-      default = [];
-      example = lib.literalExpression (lib.trim ''
-        [
-          "''${somePkg}/excludeFile"
-          "!''${somePkg}/includeFile"
-
-          "''${somePkg}/excludeFolder/"
-          "!''${somePkg}/includeFolder/"
-        ]
-      '');
-    };
 
     fixups = lib.mkOption {
       type = lib.types.attrsOf lib.types.lines;
@@ -179,8 +165,8 @@ in {
 
   config = {
     #Build a theme environment containing the SDDM theme and all its referenced Qt QML modules
-    boot.initrd.luks.sddmUnlock.theme = {
-      themeEnv = pkgs.runCommand "initrd-sddm-theme-env" rec {
+    boot.initrd.luks.sddmUnlock = {
+      theme.themeEnv = pkgs.runCommand "initrd-sddm-theme-env" rec {
         __structuredAttrs = true;
         nativeBuildInputs = with pkgs; [python3];
 
@@ -203,11 +189,14 @@ in {
         inherit (cfg.theme) qmlModules fixups extraPaths;
       } "python3 ${./build-theme-env.py}";
 
-      extraPaths = [
+      theme.extraPaths = [
         "/share/locale/${lib.head (lib.splitString "_" cfg.locale)}"
         "/share/locale/${lib.head (lib.splitString "." cfg.locale)}"
         "/share/locale/${cfg.locale}"
       ];
+
+      theme.envVars.FONTCONFIG_FILE = lib.mkIf (fontConfDir != null) "${fontConfDir}/fonts.conf";
+      theme.envVars.QT_QPA_EGLFS_CURSOR = lib.mkIf (cursorAtlas != null) "${cursorAtlas}/config.json";
 
       extraClosureRules =
         [
@@ -223,9 +212,6 @@ in {
           }/")
           cfg.theme.extraPaths
         );
-
-      envVars.FONTCONFIG_FILE = lib.mkIf (fontConfDir != null) "${fontConfDir}/fonts.conf";
-      envVars.QT_QPA_EGLFS_CURSOR = lib.mkIf (cursorAtlas != null) "${cursorAtlas}/config.json";
     };
 
     #Hook up theme Qt modules / plugins
