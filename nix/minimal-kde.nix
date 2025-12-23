@@ -82,6 +82,27 @@ in
       dontWrapQtApps = true;
     };
 
+    sddm-theme = stdenv.mkDerivation {
+      pname = "sddm-theme";
+      inherit (final.plasma-desktop) version;
+
+      srcs = [final.plasma-desktop.src final.breeze.src];
+      sourceRoot = "plasma-desktop-${final.plasma-desktop.version}";
+
+      propagatedBuildInputs = [final.libplasma final.plasma-workspace];
+
+      buildPhase = ''
+        rm -rf sddm-theme/dummydata sddm-theme/components
+        mv sddm-theme/theme.conf.cmake sddm-theme/theme.conf
+        sed -i 's|''${KDE_INSTALL_FULL_DATADIR}|'"$out"'|' sddm-theme/theme.conf
+        sed -i 's|''${KDE_INSTALL_FULL_WALLPAPERDIR}|'"$out"'/share/wallpapers|' sddm-theme/theme.conf
+
+        mkdir -p $out/share/sddm/themes
+        cp -r sddm-theme $out/share/sddm/themes/breeze
+        cp -r ../breeze-*/wallpapers $out/share
+      '';
+    };
+
     itinerary = null;
     kajongg = null;
     kapidox = null;

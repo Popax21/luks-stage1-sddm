@@ -11,7 +11,6 @@ in {
     default = cfg.theme.name == "breeze";
     defaultText = lib.literalExpression ''config.boot.initrd.luks.sddmUnlock.theme.name == "breeze"'';
   };
-
   config.boot.initrd.luks.sddmUnlock.theme = lib.mkIf cfg.theme.breezeFixups {
     qt5Compat = true;
 
@@ -53,11 +52,10 @@ in {
         (fixup "org.kde.breeze.components:Battery" "echo -ne 'import QtQuick\\nItem {}' > $target")
       ];
 
-    cursorIcons = "breeze_cursors";
-    packages = [cfg.packages.kde-minimal.breeze-cursors];
-
-    envVars.QT_QPA_SYSTEM_ICON_THEME = "breeze";
-
+    packages = with cfg.packages.kde-minimal; [sddm-theme breeze-cursors];
     extraPaths = ["/share/plasma/desktoptheme/default"];
+
+    cursorIcons = "breeze_cursors";
+    envVars.QT_QPA_SYSTEM_ICON_THEME = "breeze";
   };
 }

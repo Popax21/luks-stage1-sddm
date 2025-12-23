@@ -158,9 +158,7 @@
 
       displayOutputs."Virtual1".mode = "1920x1080";
       displayDpi = 144; # - 150%
-
       theme.name = "breeze";
-      theme.packages = [pkgs.kdePackages.plasma-desktop];
     };
 
     boot.initrd.systemd.services.luks-sddm.environment.RUST_BACKTRACE = "1";

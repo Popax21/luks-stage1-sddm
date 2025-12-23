@@ -29,8 +29,7 @@ in {
     packages = lib.mkOption {
       type = lib.types.listOf lib.types.package;
       description = "Extra SDDM themes / Qt plugins / QML libraries to add to the initrd environment.";
-      default = config.services.displayManager.sddm.extraPackages;
-      defaultText = lib.literalExpression "config.services.displayManager.sddm.extraPackages";
+      default = [];
     };
 
     cursorIcons = lib.mkOption {
