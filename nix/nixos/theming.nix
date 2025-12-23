@@ -188,6 +188,6 @@ in {
     };
 
     #Copy user avatars (if enabled)
-    boot.initrd.secrets = lib.mkIf cfg.theme.syncUserAvatars (lib.genAttrs' cfg.users (u: lib.nameValuePair "/var/lib/AccountsService/users/${u}" null));
+    boot.initrd.secrets = lib.mkIf cfg.theme.syncUserAvatars (lib.genAttrs' cfg.users (u: lib.nameValuePair "/var/lib/AccountsService/icons/${u}" null));
   };
 }
