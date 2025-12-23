@@ -40,8 +40,8 @@
         builder = pkgs.writeShellScript "initrd-kms-module-closure-builder" ''
           source ${old.builder}
 
-          # export CLOSURE=${config.system.build.modulesClosure}
-          # find $CLOSURE -path '**/kernel/**' -type f -exec sh -c 'rm $out/$(realpath --relative-to=$CLOSURE {})' \;
+          export CLOSURE=${config.system.build.modulesClosure}
+          find $CLOSURE -path '**/kernel/**' -type f -exec sh -c 'rm $out/$(realpath --relative-to=$CLOSURE {})' \;
         '';
       })
     else null;
