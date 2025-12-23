@@ -13,11 +13,11 @@
   };
 
   kmsConfig = pkgs.writeText "initrd-kms-config.json" (builtins.toJSON {
+    device = cfg.driDevice;
     outputs =
       lib.mapAttrsToList (name: cfg: (lib.filterAttrs (_: v: v != null) {
         inherit name;
         inherit (cfg) mode virtualIndex;
-        device = cfg.driDevice;
         virtualPos =
           if cfg.virtualPos != null
           then "${cfg.virtualPos.x},${cfg.virtualPos.y}"
