@@ -14,11 +14,11 @@ impl<M: ModuleClient> PamModule<M> for SddmInitrdAutologin {
     ) -> nonstick::Result<()> {
         //Read the transient SDDM config file written by the daemon
         let Some(file) = std::option_env!("TRANSIENT_SDDM_CONF") else {
-            return Err(nonstick::ErrorCode::Ignore);
+            return Err(nonstick::ErrorCode::UserUnknown);
         };
 
         if !std::fs::exists(file).unwrap_or(false) {
-            return Err(nonstick::ErrorCode::Ignore);
+            return Err(nonstick::ErrorCode::UserUnknown);
         }
 
         let config = match ini::Ini::load_from_file(file) {
@@ -28,7 +28,7 @@ impl<M: ModuleClient> PamModule<M> for SddmInitrdAutologin {
                     handle,
                     "error parsing transient initrd LUKS unlock SDDM config: {err:#}"
                 );
-                return Err(nonstick::ErrorCode::Ignore);
+                return Err(nonstick::ErrorCode::UserUnknown);
             }
         };
 
@@ -37,7 +37,7 @@ impl<M: ModuleClient> PamModule<M> for SddmInitrdAutologin {
                 .zip(c.get("PasswordKey").and_then(|k| k.parse().ok()))
         }) else {
             nonstick::error!(handle, "malformed transient initrd LUKS unlock SDDM config");
-            return Err(nonstick::ErrorCode::Ignore);
+            return Err(nonstick::ErrorCode::UserUnknown);
         };
 
         //Check that the user is correct
@@ -46,7 +46,7 @@ impl<M: ModuleClient> PamModule<M> for SddmInitrdAutologin {
                 handle,
                 "ignoring SDDM auto login attempt for non-initrd login requestion {user:?}"
             );
-            return Err(nonstick::ErrorCode::Ignore);
+            return Err(nonstick::ErrorCode::UserUnknown);
         }
 
         //Delete the transient SDDM config file; no matter if we succeed, we only give this one attempt

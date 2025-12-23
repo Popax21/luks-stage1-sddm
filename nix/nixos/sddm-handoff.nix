@@ -45,7 +45,7 @@ in {
 
     #Configure a PAM module to properly perform the handoff
     security.pam.services.sddm-autologin.text = lib.mkBefore ''
-      auth [success=ignore ignore=2 default=bad] ${cfg.packages.luks-stage1-sddm}/lib/libluks_stage1_pam.so
+      auth [success=ignore user_unknown=2 default=bad] ${cfg.packages.luks-stage1-sddm}/lib/libluks_stage1_pam.so
       auth include sddm
       auth [default=done] pam_permit.so
     '';
