@@ -30,6 +30,7 @@
         "${matchAllPkgs}/share/i18n/"
         "${matchAllPkgs}/share/locale/"
         "${matchAllPkgs}/share/pkgconfig/"
+        "${matchAllPkgs}/share/wallpapers/"
 
         # - exclude libasan / libtsan / ...
         "${matchPkg "gcc"}/lib/"

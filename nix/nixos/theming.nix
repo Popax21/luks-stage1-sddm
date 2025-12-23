@@ -157,7 +157,7 @@ in {
 
       extraClosureRules =
         [
-          "!${cfg.theme.themeEnv}/lib/qt-6/"
+          "!${cfg.theme.themeEnv}/"
         ]
         ++ (lib.optional (cfg.theme.cursorIcons != null) "!${cursorAtlas}/")
         ++ (
