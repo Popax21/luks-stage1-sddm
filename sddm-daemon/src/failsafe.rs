@@ -1,6 +1,6 @@
 use std::{collections::HashSet, time::Duration};
 
-use anyhow::{Context, Result, ensure};
+use anyhow::{Context, Result, bail, ensure};
 use evdev::{EventType, KeyCode};
 
 static MODS: &[KeyCode] = &[
@@ -10,7 +10,7 @@ static MODS: &[KeyCode] = &[
     KeyCode::KEY_RIGHTCTRL,
 ];
 
-pub fn start_failsafe() -> Result<impl Future<Output = ()>> {
+pub async fn start_failsafe() -> Result<impl Future<Output = ()>> {
     //We start immediately after udevd, so it might take a short bit until /dev/input exists
     let mut poll_attempt = 0;
     while !std::fs::exists("/dev/input").context("failed to poll for /dev/input creation")? {
@@ -19,26 +19,44 @@ pub fn start_failsafe() -> Result<impl Future<Output = ()>> {
         std::thread::sleep(Duration::from_millis(200));
     }
 
-    //Check if the killswitch has been engaged before starting
-    let mut dev_ids = HashSet::new();
-    for dev in enumerate_keyboards() {
-        let state = dev.get_key_state().context("failed to fetch evdev state")?;
+    let mut spin_attempt = 0;
+    let mut dev_ids: HashSet<evdev::InputId> = HashSet::new();
+    loop {
+        //Check if the killswitch has been engaged before starting
+        for dev in enumerate_keyboards() {
+            let state = dev.get_key_state().context("failed to fetch evdev state")?;
 
-        println!(
-            "using evdev {} for failsafe killswitch",
-            dev.name().or(dev.physical_path()).unwrap_or("<unknown>")
-        );
+            println!(
+                "using evdev {} for failsafe killswitch",
+                dev.name().or(dev.physical_path()).unwrap_or("<unknown>")
+            );
 
-        ensure!(
-            !state.contains(KeyCode::KEY_ESC),
-            "fallback killswitch active"
-        );
+            ensure!(
+                !state.contains(KeyCode::KEY_ESC),
+                "fallback killswitch active"
+            );
 
-        dev_ids.insert(dev.input_id());
+            dev_ids.insert(dev.input_id());
+        }
+
+        //We need to have at least one keyboard to safely proceed
+        if !dev_ids.is_empty() {
+            break;
+        }
+
+        //Spin for a bit before bailing
+        if spin_attempt == 1 {
+            eprintln!("no keyboard evdev devices available - spinning for a while...");
+        }
+
+        spin_attempt += 1;
+
+        if spin_attempt > 15 {
+            bail!("no keyboard evdev devices available");
+        }
+
+        smol::Timer::after(std::time::Duration::from_millis(200)).await;
     }
-
-    //We need to have at least one keyboard to safely proceed
-    ensure!(!dev_ids.is_empty(), "no keyboard evdev devices available");
 
     //Poll the keyboard devices in the background to listen for the killswitch command
     let (tx, rx) = smol::channel::bounded::<()>(1);

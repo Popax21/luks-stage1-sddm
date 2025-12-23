@@ -101,7 +101,7 @@ fn main() -> ExitCode {
         }
 
         //Register a failsafe handler which listens for keyboard events from evdev
-        let failsafe_signal = match failsafe::start_failsafe() {
+        let failsafe_signal = match failsafe::start_failsafe().await {
             Ok(s) => s,
             Err(err) => {
                 eprintln!("failed to initialize evdev failsafe: {err:#}");
