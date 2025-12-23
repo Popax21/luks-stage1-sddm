@@ -153,6 +153,32 @@ null or (submodule)
 
 
 
+## boot\.initrd\.luks\.sddmUnlock\.driDevice
+
+
+
+The DRI device to use\. If not specified, a DRI device is picked automatically\.
+
+
+
+*Type:*
+null or string
+
+
+
+*Default:*
+` null `
+
+
+
+*Example:*
+` "/dev/dri/card2" `
+
+*Declared by:*
+ - [nix/nixos/module\.nix](nix/nixos/module.nix)
+
+
+
 ## boot\.initrd\.luks\.sddmUnlock\.locale
 
 
@@ -313,7 +339,7 @@ list of package
 
 
 *Default:*
-` config.services.displayManager.sddm.extraPackages `
+` [ ] `
 
 *Declared by:*
  - [nix/nixos/theming\.nix](nix/nixos/theming.nix)
@@ -377,6 +403,48 @@ signed integer
 
 *Default:*
 ` 32 `
+
+*Declared by:*
+ - [nix/nixos/theming\.nix](nix/nixos/theming.nix)
+
+
+
+## boot\.initrd\.luks\.sddmUnlock\.theme\.defaultFonts
+
+
+
+Set the default font families to use for various font types\.
+
+
+
+*Type:*
+attribute set of list of string
+
+
+
+*Default:*
+` { } `
+
+
+
+*Example:*
+
+```
+{
+  emoji = [
+    "Noto Color Emoji"
+  ];
+  monospace = [
+    "Hack"
+  ];
+  sans-serif = [
+    "Noto Sans"
+  ];
+  serif = [
+    "Noto Serif"
+  ];
+}
+```
 
 *Declared by:*
  - [nix/nixos/theming\.nix](nix/nixos/theming.nix)
@@ -507,6 +575,27 @@ attribute set of strings concatenated with “\\n”
   "some/file" = "rm $target";
 }
 ```
+
+*Declared by:*
+ - [nix/nixos/theming\.nix](nix/nixos/theming.nix)
+
+
+
+## boot\.initrd\.luks\.sddmUnlock\.theme\.fontPackages
+
+
+
+Font packages to make available in the initrd environment\.
+
+
+
+*Type:*
+list of package
+
+
+
+*Default:*
+` [ ] `
 
 *Declared by:*
  - [nix/nixos/theming\.nix](nix/nixos/theming.nix)

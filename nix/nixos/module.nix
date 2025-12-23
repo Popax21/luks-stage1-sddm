@@ -17,6 +17,7 @@
       lib.mapAttrsToList (name: cfg: (lib.filterAttrs (_: v: v != null) {
         inherit name;
         inherit (cfg) mode virtualIndex;
+        device = cfg.driDevice;
         virtualPos =
           if cfg.virtualPos != null
           then "${cfg.virtualPos.x},${cfg.virtualPos.y}"
@@ -125,6 +126,12 @@ in {
       type = lib.types.ints.positive;
       description = "The DPI of the output display. Note that DPI may not be specified per-screen, and must be identical when multiple monitors are in-use.";
       default = 96;
+    };
+    driDevice = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      description = "The DRI device to use. If not specified, a DRI device is picked automatically.";
+      default = null;
+      example = "/dev/dri/card2";
     };
 
     locale = lib.mkOption {
