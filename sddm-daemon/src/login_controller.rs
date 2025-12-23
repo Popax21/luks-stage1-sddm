@@ -68,7 +68,14 @@ impl LoginController {
             return;
         };
 
-        if !self.sddm_config.luks_devices.iter().any(|dev| dev == path) {
+        let canon_path = std::fs::canonicalize(path).unwrap();
+
+        if !self
+            .sddm_config
+            .luks_devices
+            .iter()
+            .any(|dev| std::fs::canonicalize(dev).unwrap() == canon_path)
+        {
             println!("ignoring password request for non-configured LUKS device {path:?}");
             return;
         }

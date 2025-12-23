@@ -45,15 +45,6 @@ fn main() -> ExitCode {
         }
     };
 
-    //Register a failsafe handler which listens for keyboard events from evdev
-    let failsafe_signal = match failsafe::start_failsafe() {
-        Ok(s) => s,
-        Err(err) => {
-            eprintln!("failed to initialize evdev failsafe: {err:#}");
-            return ExitCode::FAILURE;
-        }
-    };
-
     //Pivot/chroot into /sysroot once it's mounted
     let sysroot_pivot_task = smol::spawn(async move {
         // - wait for a SIGUSR1 signal which tells us that /sysroot was successfully mounted
@@ -108,6 +99,15 @@ fn main() -> ExitCode {
             eprintln!("no DRI/DRM device became available");
             return ExitCode::FAILURE;
         }
+
+        //Register a failsafe handler which listens for keyboard events from evdev
+        let failsafe_signal = match failsafe::start_failsafe() {
+            Ok(s) => s,
+            Err(err) => {
+                eprintln!("failed to initialize evdev failsafe: {err:#}");
+                return ExitCode::FAILURE;
+            }
+        };
 
         //Start the SDDM greeter
         let mut greeter = {

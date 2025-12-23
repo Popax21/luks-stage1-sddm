@@ -1,7 +1,14 @@
-use std::time::Duration;
+use std::{collections::HashSet, time::Duration};
 
 use anyhow::{Context, Result, ensure};
 use evdev::{EventType, KeyCode};
+
+static MODS: &[KeyCode] = &[
+    KeyCode::KEY_LEFTSHIFT,
+    KeyCode::KEY_LEFTCTRL,
+    KeyCode::KEY_RIGHTSHIFT,
+    KeyCode::KEY_RIGHTCTRL,
+];
 
 pub fn start_failsafe() -> Result<impl Future<Output = ()>> {
     //We start immediately after udevd, so it might take a short bit until /dev/input exists
@@ -12,47 +19,51 @@ pub fn start_failsafe() -> Result<impl Future<Output = ()>> {
         std::thread::sleep(Duration::from_millis(200));
     }
 
-    //Grab all keyboard evdev devices
-    let mut devs = Vec::new();
-    for (path, dev) in evdev::enumerate() {
-        if !dev.supported_events().contains(EventType::KEY)
-            && !dev.supported_events().contains(EventType::REPEAT)
-        {
-            continue;
-        }
+    //Check if the killswitch has been engaged before starting
+    let mut dev_ids = HashSet::new();
+    for dev in enumerate_keyboards() {
+        let state = dev.get_key_state().context("failed to fetch evdev state")?;
 
-        //Check if the killswitch has been engaged
-        let state = dev
-            .get_key_state()
-            .with_context(|| format!("failed to fetch evdev {path:?} state"))?;
+        println!(
+            "using evdev {} for failsafe killswitch",
+            dev.name().or(dev.physical_path()).unwrap_or("<unknown>")
+        );
 
         ensure!(
             !state.contains(KeyCode::KEY_ESC),
             "fallback killswitch active"
         );
 
-        devs.push(dev);
+        dev_ids.insert(dev.input_id());
     }
 
     //We need to have at least one keyboard to safely proceed
-    ensure!(!devs.is_empty(), "no keyboard evdev devices to grab");
+    ensure!(!dev_ids.is_empty(), "no keyboard evdev devices available");
 
     //Poll the keyboard devices in the background to listen for the killswitch command
     let (tx, rx) = smol::channel::bounded::<()>(1);
 
     std::thread::spawn(move || {
         'failsafe: loop {
-            for dev in &mut devs {
-                static MODS: &[KeyCode] = &[
-                    KeyCode::KEY_LEFTSHIFT,
-                    KeyCode::KEY_LEFTCTRL,
-                    KeyCode::KEY_RIGHTSHIFT,
-                    KeyCode::KEY_RIGHTCTRL,
-                ];
-
+            //Check if the failsafe was engaged after startup
+            for dev in enumerate_keyboards() {
                 let state = dev.get_key_state().expect("failed to fetch evdev state");
-                if MODS.iter().any(|&c| state.contains(c)) && state.contains(KeyCode::KEY_ESC) {
-                    break 'failsafe;
+
+                if dev_ids.insert(dev.input_id()) {
+                    // - new device
+                    println!(
+                        "using evdev {} for failsafe killswitch",
+                        dev.name().or(dev.physical_path()).unwrap_or("<unknown>")
+                    );
+
+                    if state.contains(KeyCode::KEY_ESC) {
+                        break 'failsafe;
+                    }
+                } else {
+                    // - existing device
+                    if state.contains(KeyCode::KEY_ESC) && MODS.iter().any(|&c| state.contains(c)) {
+                        break 'failsafe;
+                    }
                 }
             }
 
@@ -68,5 +79,15 @@ pub fn start_failsafe() -> Result<impl Future<Output = ()>> {
 
     Ok(async move {
         _ = rx.recv().await;
+    })
+}
+
+fn enumerate_keyboards() -> impl Iterator<Item = evdev::Device> {
+    evdev::enumerate().map(|(_, d)| d).filter(|dev| {
+        dev.supported_events().contains(EventType::KEY)
+            && dev.supported_events().contains(EventType::REPEAT)
+            && dev.supported_keys().is_some_and(|k| {
+                k.contains(KeyCode::KEY_ESC) && MODS.iter().any(|&m| k.contains(m))
+            })
     })
 }
