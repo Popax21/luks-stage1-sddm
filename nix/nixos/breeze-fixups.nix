@@ -1,6 +1,7 @@
 {
   config,
   lib,
+  pkgs,
   ...
 }: let
   cfg = config.boot.initrd.luks.sddmUnlock;
@@ -54,6 +55,20 @@ in {
 
     packages = with cfg.packages.kde-minimal; [sddm-theme breeze-cursors];
     extraPaths = ["/share/plasma/desktoptheme/default"];
+
+    fontPackages = [
+      (pkgs.runCommandLocal "noto-fonts-minimal" {} ''
+        mkdir -p $out/share/fonts/noto
+        cp '${pkgs.noto-fonts}/share/fonts/noto/NotoSerif[wdth,wght].ttf' $out/share/fonts/noto
+        cp '${pkgs.noto-fonts}/share/fonts/noto/NotoSans[wdth,wght].ttf' $out/share/fonts/noto
+      '')
+      pkgs.hack-font
+    ];
+    defaultFonts = {
+      serif = ["Noto Serif"];
+      sans-serif = ["Noto Sans"];
+      monospace = ["Hack"];
+    };
 
     cursorIcons = "breeze_cursors";
     envVars.QT_QPA_SYSTEM_ICON_THEME = "breeze";

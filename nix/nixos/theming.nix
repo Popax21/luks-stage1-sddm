@@ -9,6 +9,43 @@
   qt6-minimal = cfg.packages.qt6-minimal;
   qtPkgs = [qt6-minimal.qtdeclarative qt6-minimal.qtsvg] ++ (lib.optional cfg.theme.qt5Compat qt6-minimal.qt5compat);
 
+  fontConf = let
+    defaultCfg = name: fonts: ''
+      <alias binding="same">
+        <family>${name}</family>
+        <prefer>
+          ${lib.concatLines (map (f: "<family>${f}</family>") fonts)}
+        </prefer>
+      </alias>
+    '';
+  in
+    pkgs.writeText "initrd-fontconfig.conf" ''
+      <?xml version='1.0'?>
+      <!DOCTYPE fontconfig SYSTEM 'urn:fontconfig:fonts.dtd'>
+      <fontconfig>
+        <include ignore_missing="yes">${pkgs.fontconfig.out}/conf.d</include>
+        ${lib.concatLines (map (f: "<dir>${f}</dir>") cfg.theme.fontPackages)}
+        ${lib.concatLines (lib.mapAttrsToList defaultCfg cfg.theme.defaultFonts)}
+      </fontconfig>
+    '';
+
+  fontConfDir =
+    if cfg.theme.fontPackages != []
+    then
+      pkgs.runCommand "initrd-fontconfig-dir" {} ''
+        mkdir -p $out/conf.d
+
+        FC=${pkgs.fontconfig.out}/etc/fonts
+        sed 's|/etc/fonts/conf.d|'$out'/conf.d|;/<dir/d;/<cachedir/d' $FC/fonts.conf > $out/fonts.conf
+
+        for f in $(ls $FC/conf.d); do
+          cp $(readlink -f $FC/conf.d/$f) $out/conf.d/$f
+        done
+
+        cp ${fontConf} $out/conf.d/55-initrd-fontconfig.conf
+      ''
+    else null;
+
   cursorAtlas =
     if cfg.theme.cursorIcons != null
     then
@@ -32,6 +69,29 @@ in {
       default = [];
     };
 
+    syncUserAvatars = lib.mkOption {
+      type = lib.types.bool;
+      description = "Whether to copy user avatars into the initrd using the initrd secrets mechanism to be shown by the stage 1 SDDM greeter.";
+      default = config.boot.loader.supportsInitrdSecrets;
+    };
+
+    fontPackages = lib.mkOption {
+      type = lib.types.listOf lib.types.package;
+      description = "Font packages to make available in the initrd environment.";
+      default = [];
+    };
+    defaultFonts = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.listOf lib.types.str);
+      description = "Set the default font families to use for various font types.";
+      default = {};
+      example = {
+        serif = ["Noto Serif"];
+        sans-serif = ["Noto Sans"];
+        monospace = ["Hack"];
+        emoji = ["Noto Color Emoji"];
+      };
+    };
+
     cursorIcons = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       description = "The icon set to use for the mouse cursor, or `null` for the default Qt cursors.";
@@ -41,12 +101,6 @@ in {
       type = lib.types.int;
       description = "The size of cursor to use in pixels.";
       default = builtins.ceil (32 * (cfg.displayDpi / 96.0));
-    };
-
-    syncUserAvatars = lib.mkOption {
-      type = lib.types.bool;
-      description = "Whether to copy user avatars into the initrd using the initrd secrets mechanism to be shown by the stage 1 SDDM greeter.";
-      default = config.boot.loader.supportsInitrdSecrets;
     };
 
     qtSwRendering = lib.mkOption {
@@ -159,7 +213,8 @@ in {
         [
           "!${cfg.theme.themeEnv}/"
         ]
-        ++ (lib.optional (cfg.theme.cursorIcons != null) "!${cursorAtlas}/")
+        ++ (lib.optional (fontConfDir != null) "!${fontConfDir}/")
+        ++ (lib.optional (cursorAtlas != null) "!${cursorAtlas}/")
         ++ (
           map (p: "!${cfg.theme.themeEnv}/${
             if lib.hasPrefix "/" p
@@ -169,6 +224,7 @@ in {
           cfg.theme.extraPaths
         );
 
+      envVars.FONTCONFIG_FILE = lib.mkIf (fontConfDir != null) "${fontConfDir}/fonts.conf";
       envVars.QT_QPA_EGLFS_CURSOR = lib.mkIf (cursorAtlas != null) "${cursorAtlas}/config.json";
     };
 
@@ -183,7 +239,11 @@ in {
       };
 
     boot.initrd.luks.sddmUnlock = {
-      closureContents = qtPkgs ++ (lib.optional (cursorAtlas != null) cursorAtlas);
+      closureContents =
+        qtPkgs
+        ++ (lib.optional (fontConfDir != null) fontConfDir)
+        ++ (lib.optional (cursorAtlas != null) cursorAtlas);
+
       closureBuildDeps = [cfg.theme.themeEnv.raw] ++ (lib.attrValues cfg.theme.qmlModules);
     };
 
