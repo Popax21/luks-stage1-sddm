@@ -60,6 +60,13 @@ impl PasswordRequest {
         })
         .flatten();
 
+        // - handle existing requests
+        let mut reqs = Vec::new();
+        for ent in std::fs::read_dir(REQUESTS_DIR).context("failed to read requests dir")? {
+            reqs.push(ent.context("failed to read request dir entry")?.path());
+        }
+        let events = smol::stream::iter(reqs).chain(events);
+
         //Handle any events that come in
         Ok(events.filter_map(|path| {
             //We only care about files which start with `ask.XXXXXXX`

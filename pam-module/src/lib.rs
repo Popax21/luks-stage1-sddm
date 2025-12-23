@@ -17,6 +17,10 @@ impl<M: ModuleClient> PamModule<M> for SddmInitrdAutologin {
             return Err(nonstick::ErrorCode::Ignore);
         };
 
+        if !std::fs::exists(file).unwrap_or(false) {
+            return Err(nonstick::ErrorCode::Ignore);
+        }
+
         let config = match ini::Ini::load_from_file(file) {
             Ok(c) => c,
             Err(err) => {
