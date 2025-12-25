@@ -176,6 +176,13 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = cfg.users != [];
+        message = "`boot.initrd.luks.sddmUnlock.users` needs to contain at least one user for LUKS stage 1 SDDM unlocking to be enabled.";
+      }
+    ];
+
     boot.initrd = {
       systemd = {
         #We need stage 1 systemd for any of this to work

@@ -240,6 +240,13 @@ in {
     };
 
     #Copy user avatars (if enabled)
+    assertions = [
+      {
+        assertion = cfg.theme.syncUserAvatars -> config.boot.loader.supportsInitrdSecrets;
+        message = "The selected boot loader must support initrd secrets for stage 1 SDDM user avatar synchronization to be enabled.";
+      }
+    ];
+
     system.build.initialRamdiskSecretAppender = lib.mkIf (cfg.enable && cfg.theme.syncUserAvatars) (
       let
         buildOpt = options.system.build;
@@ -260,7 +267,7 @@ in {
                 ]}; do
                   if [ -f "$path" ]; then
                     cp "$path" "$initrdUserAvatars/${user}"
-                    echo "Copying user '${user}' avatar $path to initrd"
+                    echo "Copying user '${user}' avatar $path to initrd $1"
                     break
                   fi
                 done
