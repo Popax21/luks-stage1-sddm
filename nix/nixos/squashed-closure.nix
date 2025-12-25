@@ -2,6 +2,7 @@
   config,
   options,
   lib,
+  utils,
   pkgs,
   ...
 }: let
@@ -135,43 +136,44 @@ in {
       ];
 
       #If we're sideloading copy the closure from the EFI partition
-      services.luks-sddm-acquire-closure = lib.mkIf cfg.sideloadClosure {
-        description = "Acquire SDDM Closure for Graphical LUKS Unlock";
+      services.luks-sddm-acquire-closure = let
+        efiFs = config.fileSystems.${efiDir};
+        efiDevUnit = "${utils.escapeSystemdPath efiFs.device}.device";
 
-        before = ["luks-sddm.service"];
-        requiredBy = ["luks-sddm.service"];
-        unitConfig.DefaultDependencies = false;
+        escp = lib.escapeShellArg squashedClosurePath;
+      in
+        lib.mkIf cfg.sideloadClosure {
+          description = "Acquire SDDM Closure for Graphical LUKS Unlock";
 
-        unitConfig.RequiresMountsFor = "/efi";
-        unitConfig.ConditionPathExists = "/efi/${squashedClosurePath}";
+          after = config.boot.initrd.systemd.services.luks-sddm.after ++ [efiDevUnit];
+          before = ["luks-sddm.service"];
+          requires = [efiDevUnit];
+          requiredBy = ["luks-sddm.service"];
+          unitConfig.DefaultDependencies = false;
 
-        serviceConfig.Type = "oneshot";
-        script = let
-          escp = lib.escapeShellArg squashedClosurePath;
-        in ''
-          cp /efi/${escp} ${escp}-unver
-          if sha256sum -c --status --strict <(echo $(cat ${squashedClosure.hash}) ${escp}-unver); then
-            echo squashed LUKS closure hash OK
-            mv ${escp}-unver ${escp}
-          else
-            echo squashed LUKS closure hash mismatch! >&2
-            exit 1
-          fi
-        '';
-      };
-      mounts = lib.mkIf cfg.sideloadClosure [
-        (let
-          efiFs = config.fileSystems.${efiDir};
-        in
-          assert efiFs.enable;
-          assert efiFs.depends == [];
-          assert !efiFs.encrypted.enable; {
-            what = efiFs.device;
-            where = "/efi";
-            type = efiFs.fsType;
-            options = lib.concatStringsSep "," (["ro"] ++ (lib.remove "rw" efiFs.options));
-          })
-      ];
+          serviceConfig.Type = "oneshot";
+          script = ''
+            mkdir -p /efi
+            mount ${lib.escapeShellArgs [
+              "-t"
+              efiFs.fsType
+              "-o"
+              (lib.concatStringsSep "," (["ro"] ++ (lib.remove "rw" efiFs.options)))
+              efiFs.device
+              "/efi"
+            ]}
+            cp /efi/${escp} ${escp}-unver
+            umount /efi
+
+            if sha256sum -c --status --strict <(echo $(cat ${squashedClosure.hash}) ${escp}-unver); then
+              echo squashed LUKS closure hash OK
+              mv ${escp}-unver ${escp}
+            else
+              echo squashed LUKS closure hash mismatch! >&2
+              exit 1
+            fi
+          '';
+        };
 
       #Mount the squashed closure before startup
       services.luks-sddm = {
@@ -197,9 +199,10 @@ in {
         buildVal = buildOpt.type.merge buildOpt.loc buildDefs;
       in
         lib.mkForce (pkgs.writeShellScript "install-bootloader-hooked" ''
-          ${buildVal.installBootLoader} "$@"
-          echo "Installing squashed SDDM initrd closure for graphical LUKS unlock"
-          ${lib.getExe' pkgs.coreutils "cp"} ${squashedClosure} "${efiDir}/${squashedClosurePath}"
+          if ${buildVal.installBootLoader} "$@"; then
+            echo "Installing squashed SDDM initrd closure for graphical LUKS unlock"
+            ${lib.getExe' pkgs.coreutils "cp"} ${squashedClosure} "${efiDir}/${squashedClosurePath}"
+          fi
         '')
     );
 

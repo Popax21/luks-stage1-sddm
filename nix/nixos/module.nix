@@ -185,7 +185,7 @@ in {
         services.luks-sddm = {
           description = "SDDM Graphical LUKS Unlock";
 
-          after = ["systemd-sysctl.service" "systemd-udevd.service"];
+          after = ["systemd-modules-load.service" "systemd-sysctl.service" "systemd-udevd.service"];
           before = ["cryptsetup-pre.target" "systemd-ask-password-console.service"];
           wantedBy = ["cryptsetup.target"];
           unitConfig.DefaultDependencies = false;
