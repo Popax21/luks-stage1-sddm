@@ -42,3 +42,4 @@ See [here](MODULE_OPTIONS.md).
    - additionally, nice-to-haves like different DPIs per screen are fundamentally incompatible with its architecture
    - this might be addressed by shipping a minimal Wayland compositor in the SDDM closure to properly support multi-monitor scenarios (maybe automatically sourcing monitor configuration data from `kwinoutputconfig.json` as well)
  - the closure size could be reduced even further by stripping unreferenced dynamic libraries from the closure
+ - some KMS modules (*cough cough* NVIDIA) pretty much ship the entire driver stack already; maybe we can fully use the GPU and not rely on SW rendering for those (would need to trim down `nvidia-x11` somehow tho)
