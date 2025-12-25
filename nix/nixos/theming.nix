@@ -1,5 +1,6 @@
 {
   config,
+  options,
   lib,
   pkgs,
   ...
@@ -239,6 +240,33 @@ in {
     };
 
     #Copy user avatars (if enabled)
-    boot.initrd.secrets = lib.mkIf cfg.theme.syncUserAvatars (lib.genAttrs' cfg.users (u: lib.nameValuePair "/var/lib/AccountsService/icons/${u}" null));
+    system.build.initialRamdiskSecretAppender = lib.mkIf (cfg.enable && cfg.theme.syncUserAvatars) (
+      let
+        buildOpt = options.system.build;
+        buildDefs = builtins.filter (d: d.file != (toString ./theming.nix)) buildOpt.definitionsWithLocations;
+        buildVal = buildOpt.type.merge buildOpt.loc buildDefs;
+      in
+        lib.mkForce (pkgs.writeShellScriptBin "append-initrd-secrets" ''
+          export initrdUserAvatars=$(mktemp -d ''${TMPDIR:-/tmp}/initrd-user-avatars.XXXXXXXXXX)
+
+          ${lib.concatLines (map
+            (user: ''
+              for path in ${lib.escapeShellArgs [
+                "${config.users.users.${user}.home}/.face.icon"
+                "/var/lib/AccountsService/icons/${user}"
+              ]}; do
+                if [ -f "$path" ]; then
+                  cp "$path" "$initrdUserAvatars/${user}"
+                  echo "Copying user '${user}' avatar $path to initrd"
+                  break
+                fi
+              done
+            '')
+            cfg.users)}
+
+          exec ${lib.getExe buildVal.initialRamdiskSecretAppender} "$@"
+        '')
+    );
+    boot.initrd.secrets."/var/lib/AccountsService/icons" = lib.mkIf (cfg.enable && cfg.theme.syncUserAvatars) "/$initrdUserAvatars"; # :p
   };
 }
