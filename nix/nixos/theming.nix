@@ -249,7 +249,8 @@ in {
         lib.mkForce (pkgs.writeShellApplication {
           name = "append-initrd-secrets";
           text = ''
-            export initrdUserAvatars=$(mktemp -d ''${TMPDIR:-/tmp}/initrd-user-avatars.XXXXXXXXXX)
+            initrdUserAvatars=$(mktemp -d "''${TMPDIR:-/tmp}"/initrd-user-avatars.XXXXXXXXXX)
+            export initrdUserAvatars
 
             ${lib.concatLines (map
               (user: ''
