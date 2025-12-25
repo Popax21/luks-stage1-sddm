@@ -246,26 +246,30 @@ in {
         buildDefs = builtins.filter (d: d.file != (toString ./theming.nix)) buildOpt.definitionsWithLocations;
         buildVal = buildOpt.type.merge buildOpt.loc buildDefs;
       in
-        lib.mkForce (pkgs.writeShellScriptBin "append-initrd-secrets" ''
-          export initrdUserAvatars=$(mktemp -d ''${TMPDIR:-/tmp}/initrd-user-avatars.XXXXXXXXXX)
+        lib.mkForce (pkgs.writeShellApplication {
+          name = "append-initrd-secrets";
+          text = ''
+            export initrdUserAvatars=$(mktemp -d ''${TMPDIR:-/tmp}/initrd-user-avatars.XXXXXXXXXX)
 
-          ${lib.concatLines (map
-            (user: ''
-              for path in ${lib.escapeShellArgs [
-                "${config.users.users.${user}.home}/.face.icon"
-                "/var/lib/AccountsService/icons/${user}"
-              ]}; do
-                if [ -f "$path" ]; then
-                  cp "$path" "$initrdUserAvatars/${user}"
-                  echo "Copying user '${user}' avatar $path to initrd"
-                  break
-                fi
-              done
-            '')
-            cfg.users)}
+            ${lib.concatLines (map
+              (user: ''
+                for path in ${lib.escapeShellArgs [
+                  "${config.users.users.${user}.home}/.face.icon"
+                  "/var/lib/AccountsService/icons/${user}"
+                ]}; do
+                  if [ -f "$path" ]; then
+                    cp "$path" "$initrdUserAvatars/${user}"
+                    echo "Copying user '${user}' avatar $path to initrd"
+                    break
+                  fi
+                done
+              '')
+              cfg.users)}
 
-          exec ${lib.getExe buildVal.initialRamdiskSecretAppender} "$@"
-        '')
+            exec ${lib.getExe buildVal.initialRamdiskSecretAppender} "$@"
+          '';
+          runtimeInputs = [pkgs.coreutils];
+        })
     );
     boot.initrd.secrets."/var/lib/AccountsService/icons" = lib.mkIf (cfg.enable && cfg.theme.syncUserAvatars) "/$initrdUserAvatars"; # :p
   };
