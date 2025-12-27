@@ -8,6 +8,30 @@
 }: let
   cfg = config.boot.initrd.luks.sddmUnlock;
 
+  kmsModuleClosure =
+    if cfg.kmsModules != []
+    then
+      (pkgs.makeModulesClosure {
+        rootModules = lib.concatLists [
+          cfg.kmsModules
+          # - also include the baseline modules to ensure our depmod output doesn't hide any modules
+          config.boot.initrd.kernelModules
+          config.boot.initrd.availableKernelModules
+        ];
+        kernel = config.system.modulesTree;
+        firmware = config.hardware.firmware;
+        allowMissing = config.boot.initrd.allowMissingModules;
+        inherit (config.boot.initrd) extraFirmwarePaths;
+      }).overrideAttrs (old: {
+        builder = pkgs.writeShellScript "initrd-kms-module-closure-builder" ''
+          source ${old.builder}
+
+          export CLOSURE=${config.system.build.modulesClosure}
+          find $CLOSURE -path '**/kernel/**' -type f -exec sh -c 'rm $out/$(realpath --relative-to=$CLOSURE {})' \;
+        '';
+      })
+    else null;
+
   squashedClosurePath = "/luks-sddm-closure.sqsh";
   squashedClosure = pkgs.runCommand "initrd-sddm-closure.sqsh" {
     __structuredAttrs = true;
@@ -135,24 +159,25 @@ in {
         ])
       ];
 
-      #If we're sideloading copy the closure from the EFI partition
+      #Acquire / mount the closure before anything that needs it (i.e. the luks-sddm.service / udev for KMS modules)
       services.luks-sddm-acquire-closure = let
         efiFs = config.fileSystems.${efiDir};
         efiDevUnit = "${utils.escapeSystemdPath efiFs.device}.device";
 
         escp = lib.escapeShellArg squashedClosurePath;
-      in
-        lib.mkIf cfg.sideloadClosure {
-          description = "Acquire SDDM Closure for Graphical LUKS Unlock";
+      in {
+        description = "Acquire SDDM Closure for Graphical LUKS Unlock";
 
-          after = config.boot.initrd.systemd.services.luks-sddm.after ++ [efiDevUnit];
-          before = ["luks-sddm.service"];
-          requires = [efiDevUnit];
-          requiredBy = ["luks-sddm.service"];
-          unitConfig.DefaultDependencies = false;
+        after = config.boot.initrd.systemd.services.luks-sddm.after ++ (lib.optional cfg.sideloadClosure efiDevUnit);
+        before = ["luks-sddm.service"] ++ (lib.optional (kmsModuleClosure != null) "systemd-udev-trigger.service");
+        requires = lib.optional cfg.sideloadClosure efiDevUnit;
+        requiredBy = ["luks-sddm.service"];
+        unitConfig.DefaultDependencies = false;
 
-          serviceConfig.Type = "oneshot";
-          script = ''
+        serviceConfig.Type = "oneshot";
+        script = lib.concatLines [
+          # - if we're sideloading, copy the closure from the EFI partition
+          (lib.optionalString cfg.sideloadClosure ''
             mkdir -p /efi
             mount ${lib.escapeShellArgs [
               "-t"
@@ -172,17 +197,18 @@ in {
               echo squashed LUKS closure hash mismatch! >&2
               exit 1
             fi
-          '';
-        };
-
-      #Mount the squashed closure before startup
-      services.luks-sddm = {
-        preStart = lib.mkBefore ''
-          mkdir -p /tmp/luks-sddm-closure
-          mount -t squashfs -o loop ${lib.escapeShellArg squashedClosurePath} /tmp/luks-sddm-closure
-          mount -t overlay overlay -o lowerdir=${builtins.storeDir}:/tmp/luks-sddm-closure${builtins.storeDir} ${builtins.storeDir}
-        '';
-        unitConfig.ConditionPathExists = squashedClosurePath;
+          '')
+          # - mount the closure and overlay it over the Nix store
+          ''
+            mkdir -p /tmp/luks-sddm-closure
+            mount -t squashfs -o loop ${lib.escapeShellArg squashedClosurePath} /tmp/luks-sddm-closure
+            mount -t overlay overlay -o lowerdir=${builtins.storeDir}:/tmp/luks-sddm-closure${builtins.storeDir} ${builtins.storeDir}
+          ''
+          # - make KMS kernel modules available to modprobe
+          (lib.optionalString (kmsModuleClosure != null) ''
+            mount -t overlay overlay -o lowerdir=${kmsModuleClosure}/lib:/lib /lib
+          '')
+        ];
       };
     };
 
@@ -205,6 +231,12 @@ in {
           fi
         '')
     );
+
+    #Copy the KMS modules into the closure (if modules were specified)
+    boot.initrd.luks.sddmUnlock = {
+      closureContents = lib.optional (kmsModuleClosure != null) kmsModuleClosure;
+      extraClosureRules = lib.optional (kmsModuleClosure != null) "!${kmsModuleClosure}/";
+    };
 
     #Pin the initrd closure packages (if enabled)
     nixpkgs.overlays = lib.optional (cfg.pinPkgs != null) (final: prev: {
