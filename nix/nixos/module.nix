@@ -31,7 +31,12 @@
     if cfg.kmsModules != []
     then
       (pkgs.makeModulesClosure {
-        rootModules = cfg.kmsModules;
+        rootModules = lib.concatLists [
+          cfg.kmsModules
+          # - also include the baseline modules to ensure our depmod output doesn't hide any modules
+          config.boot.initrd.kernelModules
+          config.boot.initrd.availableKernelModules
+        ];
         kernel = config.system.modulesTree;
         firmware = config.hardware.firmware;
         allowMissing = config.boot.initrd.allowMissingModules;
@@ -207,13 +212,8 @@ in {
 
           # - load all KMS kernel modules before startup
           preStart = lib.mkIf (kmsModuleClosure != null) ''
-            mkdir -p /tmp/kms-modules/lib
-            mount -t overlay overlay -o lowerdir=${kmsModuleClosure}/lib:/lib /tmp/kms-modules/lib
-            ${lib.concatLines (map (m: ''
-                echo "loading KMS module ${m}..."
-                modprobe -d /tmp/kms-modules ${m}
-              '')
-              cfg.kmsModules)}
+            mount -t overlay overlay -o lowerdir=${kmsModuleClosure}/lib/modules:/lib/modules /lib/modules
+            udevadm trigger --type=all --action=add
           '';
 
           # - if we fail, refresh the system's fbcon
