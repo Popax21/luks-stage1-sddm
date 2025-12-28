@@ -212,7 +212,21 @@ in {
 
           # - load all KMS kernel modules before startup
           preStart = lib.mkIf (kmsModuleClosure != null) ''
-            mount -t overlay overlay -o lowerdir=${kmsModuleClosure}/lib/modules:/lib/modules /lib/modules
+            #Overlay the KMS modules over /lib/modules using an overlayfs
+            # - make the mount rw to be able to bump the mtime later
+            mkdir -p /tmp/kms-modules-upper /tmp/kms-modules-work
+            mount -t overlay overlay \
+              -o lowerdir=${kmsModuleClosure}/lib/modules:/lib/modules \
+              -o upperdir=/tmp/kms-modules-upper \
+              -o workdir=/tmp/kms-modules-work \
+              /lib/modules
+
+            #Reload the udev module index so that the new modules may be loaded
+            # - kmod_validate_resources needs to return KMOD_RESOURCES_MUST_RECREATE, so bump the mtime of the new indices first
+            find /lib/modules -type f -name 'modules.*' -exec touch -m {} \;
+            udevadm control --reload
+
+            #Trigger a udev reload to load any kernel modules that we need immediately
             udevadm trigger --type=all --action=add
           '';
 
