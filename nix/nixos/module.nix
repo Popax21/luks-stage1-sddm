@@ -28,11 +28,12 @@
   });
 
   kmsModuleClosure =
-    if cfg.kmsModules != []
+    if cfg.kmsModules != [] || cfg.availableKmsModules != []
     then
       (pkgs.makeModulesClosure {
         rootModules = lib.concatLists [
           cfg.kmsModules
+          cfg.availableKmsModules
           # - also include the baseline modules to ensure our depmod output doesn't hide any modules
           config.boot.initrd.kernelModules
           config.boot.initrd.availableKernelModules
@@ -114,7 +115,13 @@ in {
 
     kmsModules = lib.mkOption {
       type = lib.types.listOf lib.types.str;
-      description = "Kernel modules to use for enabling KMS support. These kernel modules will be stored in the squashed closure.";
+      description = "Kernel modules to explicitly load for enabling KMS support. These kernel modules will be stored in the squashed closure.";
+      default = [];
+      example = ["nvidia"];
+    };
+    availableKmsModules = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      description = "Kernel modules to make available for enabling KMS support. These kernel modules will be stored in the squashed closure.";
       default = [];
       example = ["amdgpu"];
     };
@@ -228,6 +235,9 @@ in {
 
             #Trigger a udev reload to load any kernel modules that we need immediately
             udevadm trigger --type=all --action=add
+
+            #Load modules we should load explicitly
+            modprobe -a ${lib.escapeShellArgs cfg.kmsModules}
           '';
 
           # - if we fail, refresh the system's fbcon

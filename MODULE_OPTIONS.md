@@ -45,7 +45,38 @@ attribute set
 
 
 
+## boot\.initrd\.luks\.sddmUnlock\.availableKmsModules
+
+Kernel modules to make available for enabling KMS support\. These kernel modules will be stored in the squashed closure\.
+
+
+
+*Type:*
+list of string
+
+
+
+*Default:*
+` [ ] `
+
+
+
+*Example:*
+
+```
+[
+  "amdgpu"
+]
+```
+
+*Declared by:*
+ - [nix/nixos/module\.nix](nix/nixos/module.nix)
+
+
+
 ## boot\.initrd\.luks\.sddmUnlock\.displayDpi
+
+
 
 The DPI of the output display\. Note that DPI may not be specified per-screen, and must be identical when multiple monitors are in-use\.
 
@@ -218,7 +249,7 @@ list of string
 
 
 
-Kernel modules to use for enabling KMS support\. These kernel modules will be stored in the squashed closure\.
+Kernel modules to explicitly load for enabling KMS support\. These kernel modules will be stored in the squashed closure\.
 
 
 
@@ -236,7 +267,7 @@ list of string
 
 ```
 [
-  "amdgpu"
+  "nvidia"
 ]
 ```
 

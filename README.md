@@ -9,7 +9,8 @@ boot.initrd.luks.sddmUnlock = {
     enable = true;
     users = ["yourUser"];
     luksDevices = ["yourDriveLabel"];
-    kmsModules = ["amdgpu"]; # - or ["nvidia_drm"]
+    # NVIDIA: kmsModules = ["nvidia_drm"];
+    # AMD: availabeKmsModules = ["amdgpu"]; # - add it to boot.initrd.availableKernelModules instead if you get early_init errors
 };
 ```
 
