@@ -21,4 +21,5 @@ endmacro()
 
 qt6_standard_project_setup()
 add_subdirectory(lookandfeel)
+add_subdirectory(libclock)
 add_subdirectory(applets/keyboardindicator/plugin)

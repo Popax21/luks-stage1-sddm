@@ -20,6 +20,7 @@ in {
       "org.kde.ksvg" = ksvg;
       "org.kde.kirigami" = kirigami;
       "org.kde.plasma.core" = libplasma;
+      "org.kde.plasma.clock" = plasma-workspace;
       "org.kde.breeze.components" = plasma-workspace;
       "org.kde.plasma.private.keyboardindicator" = plasma-workspace;
     };
@@ -36,15 +37,6 @@ in {
       lib.mkMerge [
         #The `WallpaperFader` type has an unused import
         (sedFixup "org.kde.breeze.components:WallpaperFader" ["/import org.kde.plasma.private.sessions/d"])
-
-        #The `Clock` type pulls in the plasma5 support layer... to fetch the current time ._.
-        (sedFixup "org.kde.breeze.components:Clock" [
-          # - switch out the time source
-          ''s/timeSource\.data\["Local"\]\["DateTime"\]/new Date()/''
-          # - get rid of the old one
-          "/plasma5support/d"
-          "/P5Support.DataSource {/,/}/d"
-        ])
 
         #Don't use the Wayland virtual keyboard impl
         (sedFixup "org.kde.breeze.components:VirtualKeyboardLoader" ["s/VirtualKeyboard_wayland.qml/VirtualKeyboard.qml/"])

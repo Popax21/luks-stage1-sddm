@@ -71,7 +71,10 @@ in
     });
 
     plasma-workspace = prev.plasma-workspace.overrideAttrs {
-      postPatch = "ln -sf ${patches/plasma-workspace-CMakeLists.txt} CMakeLists.txt";
+      postPatch = ''
+        ln -sf ${patches/plasma-workspace-CMakeLists.txt} CMakeLists.txt
+        find libclock -type f -exec sed -i '/DBus/d;/sessionBus/d' {} \;
+      '';
       postInstall = "";
       postFixup = "";
 
