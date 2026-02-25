@@ -87,7 +87,7 @@
 
     env.NIX_CFLAGS_COMPILE = "-DNIXPKGS_QT_PLUGIN_PREFIX=\"${qtPluginPrefix}\"";
 
-    inherit (qt6.qtbase) preHook setupHook fix_qt_builtin_paths fix_qt_module_paths;
+    inherit (qt6.qtbase) preHook setupHook;
     dontWrapQtApps = true;
 
     outputs = ["out" "dev"];

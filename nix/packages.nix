@@ -2,7 +2,9 @@
   pkgs,
   crane,
 }:
-pkgs.lib.makeScope pkgs.newScope (self: {
+pkgs.lib.makeScope pkgs.newScope (self: let
+  pkgs = self.callPackage ({pkgs}: pkgs) {};
+in {
   stdenv = pkgs.withCFlags ["-Os"] pkgs.stdenv;
 
   libinput = pkgs.libinput.override {
