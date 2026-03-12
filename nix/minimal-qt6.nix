@@ -134,10 +134,10 @@
         "quickshapes_designhelpers"
 
         # "quickcontrols2_basic"
-        # "quickcontrols2_fusion"
+         # "quickcontrols2_fusion" # - needed by Breeze
         "quickcontrols2_stylekit"
         "quickcontrols2_universal"
-        "quickcontrols2_material"
+        # "quickcontrols2_material" # - needed by Kirigami
         "quickcontrols2_imagine"
         "quickcontrols2_fluentwinui3"
 
