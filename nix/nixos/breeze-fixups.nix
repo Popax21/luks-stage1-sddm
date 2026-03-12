@@ -48,14 +48,7 @@ in {
     packages = with cfg.packages.kde-minimal; [sddm-theme breeze-cursors];
     extraPaths = ["/share/plasma/desktoptheme/default"];
 
-    fontPackages = [
-      (pkgs.runCommandLocal "noto-fonts-minimal" {} ''
-        mkdir -p $out/share/fonts/noto
-        cp '${pkgs.noto-fonts}/share/fonts/noto/NotoSerif[wdth,wght].ttf' $out/share/fonts/noto
-        cp '${pkgs.noto-fonts}/share/fonts/noto/NotoSans[wdth,wght].ttf' $out/share/fonts/noto
-      '')
-      pkgs.hack-font
-    ];
+    fontPackages = cfg.packages.kde-minimal.fonts;
     defaultFonts = {
       serif = ["Noto Serif"];
       sans-serif = ["Noto Sans"];

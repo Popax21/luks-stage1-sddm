@@ -6,6 +6,9 @@
   kdePackages,
   qt6-minimal,
   qt6Packages,
+  runCommandLocal,
+  noto-fonts,
+  hack-font,
   ...
 }: let
   qt6Packages' = qt6Packages.overrideScope (_: _: qt6-minimal);
@@ -113,6 +116,15 @@ in
         cp -r ../breeze-*/wallpapers $out/share
       '';
     };
+
+    fonts = [
+      (runCommandLocal "noto-fonts-minimal" {} ''
+        mkdir -p $out/share/fonts/noto
+        cp '${noto-fonts}/share/fonts/noto/NotoSerif.ttf' $out/share/fonts/noto
+        cp '${noto-fonts}/share/fonts/noto/NotoSans.ttf' $out/share/fonts/noto
+      '')
+      hack-font
+    ];
 
     itinerary = null;
     kajongg = null;
