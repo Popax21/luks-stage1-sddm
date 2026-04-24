@@ -5,7 +5,7 @@ index 05ae1d7..c3ea4c1 100644
 @@ -43,7 +43,6 @@ ecm_setup_version(PROJECT
  
  # Dependencies
- set(REQUIRED_QT_VERSION 6.8.0)
+ set(REQUIRED_QT_VERSION 6.9.0)
 -find_package(Qt6Widgets ${REQUIRED_QT_VERSION} REQUIRED NO_MODULE)
  find_package(Qt6Svg ${REQUIRED_QT_VERSION} REQUIRED NO_MODULE)
  

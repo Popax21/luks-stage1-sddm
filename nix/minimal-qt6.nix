@@ -149,4 +149,7 @@
   });
 
   qttranslations = null;
+  qwlroots = null;
+  waylib = null;
+  wrapQtAppsNoGuiHook = null;
 })

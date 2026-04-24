@@ -130,6 +130,8 @@ in
     kajongg = null;
     kapidox = null;
     libquotient = null;
+    mimetreeparser = null;
+    minuet = null;
     rocs = null;
     umbrello = null;
   })
