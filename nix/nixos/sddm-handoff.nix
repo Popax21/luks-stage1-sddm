@@ -45,10 +45,22 @@ in {
     };
 
     #Configure a PAM module to properly perform the handoff
-    security.pam.services.sddm-autologin.text = lib.mkBefore ''
-      auth [success=ignore user_unknown=2 default=bad] ${cfg.packages.luks-stage1-sddm}/lib/libluks_stage1_pam.so
-      auth include sddm
-      auth [default=done] pam_permit.so
-    '';
+    security.pam.services.sddm-autologin.rules.auth = {
+      luks-stage1-handoff = {
+        order = 1;
+        control = "[success=ignore user_unknown=2 default=bad]";
+        modulePath = "${cfg.packages.luks-stage1-sddm}/lib/libluks_stage1_pam.so";
+      };
+      sddm-include = {
+        order = 2;
+        control = "include";
+        modulePath = "sddm";
+      };
+      sddm-permit = {
+        order = 3;
+        control = "[default=done]";
+        modulePath = "${config.security.pam.package}/lib/security/pam_permit.so";
+      };
+    };
   };
 }
