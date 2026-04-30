@@ -23,7 +23,7 @@
 
       postPatch = ''
         #Only build the greeter
-        sed -i 's/Core DBus Gui Qml Quick LinguistTools Test QuickTest/Core Gui Qml Quick LinguistTools/' CMakeLists.txt
+        sed -i 's/Core DBus Gui Qml Quick LinguistTools Test QuickTest/Core Gui Qml Quick Network LinguistTools/' CMakeLists.txt
         sed -i '/find_package(PAM REQUIRED)/d' CMakeLists.txt
         sed -i '/find_package(XCB REQUIRED)/d' CMakeLists.txt
         sed -i '/pkg_check_modules(LIBXAU REQUIRED "xau")/d' CMakeLists.txt

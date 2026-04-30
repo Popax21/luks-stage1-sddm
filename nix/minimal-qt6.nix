@@ -64,26 +64,58 @@
     qtPluginPrefix = "lib/qt-6/plugins";
     qtQmlPrefix = "lib/qt-6/qml";
 
-    cmakeFlags = [
-      "--log-level=STATUS"
-      "-DCMAKE_SYSTEM_VERSION="
-      "-DINSTALL_PLUGINSDIR=${qtPluginPrefix}"
-      "-DINSTALL_QMLDIR=${qtQmlPrefix}"
-      "-DQT_EMBED_TOOLCHAIN_COMPILER=OFF"
+    cmakeFlags =
+      [
+        "--log-level=STATUS"
+        "-DCMAKE_SYSTEM_VERSION="
+        "-DINSTALL_PLUGINSDIR=${qtPluginPrefix}"
+        "-DINSTALL_QMLDIR=${qtQmlPrefix}"
+        "-DQT_EMBED_TOOLCHAIN_COMPILER=OFF"
 
-      "-DFEATURE_dbus=OFF"
-      "-DFEATURE_sql=OFF"
-      "-DFEATURE_vnc=OFF"
-      "-DFEATURE_printsupport=OFF"
-      "-DFEATURE_testlib=OFF"
-      "-DFEATURE_libinput=ON"
-      "-DFEATURE_eglfs=ON"
-      "-DFEATURE_eglfs_gbm=ON"
-      "-DINPUT_opengl=es2"
+        "-DFEATURE_libinput=ON"
+        "-DFEATURE_eglfs=ON"
+        "-DFEATURE_eglfs_gbm=ON"
+        "-DINPUT_opengl=es2"
 
-      "-DQT_SKIP_AUTO_PLUGIN_INCLUSION=ON"
-      "-DQT_QPA_PLATFORMS=linuxfb;eglfs"
-    ];
+        "-DQT_SKIP_AUTO_PLUGIN_INCLUSION=ON"
+        "-DQT_QPA_PLATFORMS=linuxfb;eglfs"
+      ]
+      ++ map (f: "-DFEATURE_${f}=OFF") [
+        # - unused modules
+        "dbus"
+        "sql"
+        "printsupport"
+        "testlib"
+        "vnc"
+
+        # - unused widgets; mdiarea+syntaxhighlighter also skip the linguist GUI
+        #   (which fails to link QtNetwork upstream)
+        "mdiarea"
+        "syntaxhighlighter"
+        "whatsthis"
+        "colordialog"
+        "fontdialog"
+        "inputdialog"
+        "errormessage"
+        "progressdialog"
+        "calendarwidget"
+        "datetimeedit"
+        "columnview"
+        "undoview"
+
+        # - unused gui features
+        "pdf"
+        "picture"
+        "systemtrayicon"
+        "tabletevent"
+        "imageformat_xbm"
+        "imageformat_ppm"
+        "gif"
+        "ico"
+        "textmarkdownreader"
+        "textmarkdownwriter"
+        "textodfwriter"
+      ];
 
     env.NIX_CFLAGS_COMPILE = "-DNIXPKGS_QT_PLUGIN_PREFIX=\"${qtPluginPrefix}\"";
 
@@ -101,9 +133,10 @@
   };
 
   qttools = prev.qttools.overrideAttrs {
-    # - we only need the linguist feature
+    # - we only need the linguist feature (the GUI binary itself is skipped
+    #   via mdiarea/syntaxhighlighter being off in qtbase)
     cmakeFlags =
-      (map (f: "-DFEATURE_${f}=off") [
+      (map (f: "-DFEATURE_${f}=OFF") [
         "assistant"
         "clang"
         "qdoc"
@@ -117,7 +150,7 @@
         "qtplugininfo"
         "fullqthelp"
       ])
-      ++ ["-DFEATURE_linguist=on"];
+      ++ ["-DFEATURE_linguist=ON"];
   };
 
   qtdeclarative = prev.qtdeclarative.overrideAttrs (attrs: {
