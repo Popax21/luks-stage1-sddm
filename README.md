@@ -25,6 +25,7 @@ If not, this file is instead added to each NixOS generation's initrd individuall
 
 In case the SDDM data was corrupted / tampered with, or any other error occurs, the system will fall back to the regular console TTY password prompt.
 You may also exit the initrd SDDM at any time by pressing Ctrl+Esc / Shift+Esc, or by holding Esc while the system boots.
+When entering passwords manually, prefix them with `<username>#` - this is to ensure that all passwords are bound to their corresponding username.
 As such there should be no circumstances where usage of this module results in your system becoming unusable, however no warranties are given regardless - use at your own risk!
 
 ## How does it work?

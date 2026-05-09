@@ -123,7 +123,10 @@ impl GreeterController for LoginController {
             //Answer the request
             println!("responding to password request from {id}");
 
-            if let Err(err) = req.reply(Some(password.clone())) {
+            //Prefix the slot key with `<user>#` to bind the LUKS slot to a specific user identity
+            let slot_key = Zeroizing::new(format!("{user}#{}", &*password).into_boxed_str());
+
+            if let Err(err) = req.reply(Some(slot_key)) {
                 eprintln!("failed to reply to password request: {err:#}")
             }
         }

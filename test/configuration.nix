@@ -73,14 +73,14 @@
           serviceConfig.RemainAfterExit = true;
 
           script = let
-            users = config.users.users;
+            slotKeyFor = user: "${user}#${config.users.users.${user}.password}";
           in ''
             truncate -s 100M /tmp/test-drive
 
-            printf '%s' ${lib.escapeShellArg users.tester.password} \
+            printf '%s' ${lib.escapeShellArg (slotKeyFor "tester")} \
               | cryptsetup luksFormat --batch-mode --force-password --type luks2 /tmp/test-drive -
 
-            printf '%s\n' ${lib.escapeShellArgs [users.tester.password users.tester2.password users.tester2.password]} \
+            printf '%s\n' ${lib.escapeShellArgs (map slotKeyFor ["tester" "tester2" "tester2"])} \
               | cryptsetup luksAddKey --batch-mode --force-password /tmp/test-drive
 
             losetup /dev/loop7 /tmp/test-drive

@@ -137,6 +137,19 @@ impl<M: ModuleClient> PamModule<M> for SddmInitrdAutologin {
             }
         }
 
+        //Build prefixed slot keys binding each LUKS slot to the user identity
+        let user_str = user.to_str().ok_or(nonstick::ErrorCode::BufferError)?;
+
+        let slot_key = |authtok: &OsStr| {
+            Ok(Zeroizing::new(format!(
+                "{user_str}#{}",
+                authtok.to_str().ok_or(nonstick::ErrorCode::BufferError)?
+            )))
+        };
+
+        let old_key = slot_key(&old_authtok)?;
+        let new_key = slot_key(&new_authtok)?;
+
         //Change LUKS keys of all devices
         for &arg in &args {
             let arg = arg.to_str().map_err(|_| nonstick::ErrorCode::BufferError)?;
@@ -147,9 +160,9 @@ impl<M: ModuleClient> PamModule<M> for SddmInitrdAutologin {
             use std::io::Write;
 
             let (reader, mut writer) = std::io::pipe().unwrap();
-            writer.write_all(old_authtok.as_encoded_bytes()).unwrap();
+            writer.write_all(old_key.as_bytes()).unwrap();
             writer.write_all(b"\n").unwrap();
-            writer.write_all(new_authtok.as_encoded_bytes()).unwrap();
+            writer.write_all(new_key.as_bytes()).unwrap();
             writer.write_all(b"\n").unwrap();
 
             handle.info_msg(format!("Changing LUKS password of {device:?}"));
