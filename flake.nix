@@ -66,7 +66,16 @@
         propagatedBuildInputs = [flakePkgs.cargoArtifacts];
       };
 
-      apps.devVM = import test/dev_vm.nix {inherit self nixpkgs system;};
+      apps = {
+        devVM = import test/dev_vm.nix {
+          inherit self nixpkgs system;
+          efiSupport = false;
+        };
+        devVM-efi = import test/dev_vm.nix {
+          inherit self nixpkgs system;
+          efiSupport = true;
+        };
+      };
     }))
     // rec {
       overlays.default = final: prev: {

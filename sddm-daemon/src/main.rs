@@ -13,7 +13,7 @@ use crate::{
     power_actions::PowerActionClient,
     sddm_config::{SddmConfig, write_transient_sddm_config},
 };
-use smol::{process::Command, stream::StreamExt};
+use smol::{future::FutureExt, process::Command, stream::StreamExt};
 
 fn main() -> ExitCode {
     //Parse the SDDM config file we're given
@@ -167,6 +167,22 @@ fn main() -> ExitCode {
             if sysroot_pivot_task.is_finished() {
                 write_transient_sddm_config(&request)
                     .expect("failed to write transient SDDM config");
+
+                println!(
+                    "wrote transient SDDM handoff config for user {}",
+                    &request.user
+                );
+            } else if crate::is_hibernation_resume_queued().await {
+                //We are resuming from hibernation; handoff to the hibernation helper
+                let handoff = luks_stage1_hibernation_handoff::Handoff::new(request.user);
+                match luks_stage1_hibernation_handoff::store(&handoff) {
+                    Ok(()) => {
+                        println!("wrote hibernation handoff data for user {}", &handoff.user);
+                    }
+                    Err(err) => {
+                        eprintln!("failed to write hibernation handoff data: {err:#}");
+                    }
+                }
             } else {
                 eprintln!(
                     "can't handoff pending login request since we didn't pivot into the new sysroot yet"
@@ -249,5 +265,52 @@ async fn wait_for_dri_device() -> std::io::Result<bool> {
         }
 
         smol::Timer::after(std::time::Duration::from_millis(200)).await;
+    }
+}
+
+async fn is_hibernation_resume_queued() -> bool {
+    #[zbus::proxy(
+        interface = "org.freedesktop.systemd1.Manager",
+        default_service = "org.freedesktop.systemd1",
+        default_path = "/org/freedesktop/systemd1"
+    )]
+    trait SystemdManager {
+        fn get_unit(&self, name: &str) -> zbus::Result<zbus::zvariant::OwnedObjectPath>;
+    }
+
+    async fn access_hibernate_resume() -> zbus::Result<()> {
+        //Connect to the system D-Bus
+        let conn = zbus::conn::Builder::system()?
+            .internal_executor(false)
+            .build()
+            .await?;
+
+        let poll_conn = async {
+            loop {
+                conn.executor().tick().await;
+            }
+        };
+
+        //Attempt to access the systemd-hibernate-resume service
+        SystemdManagerProxy::new(&conn)
+            .await?
+            .get_unit("systemd-hibernate-resume.service")
+            .race(poll_conn)
+            .await?;
+
+        Ok(())
+    }
+
+    match access_hibernate_resume().await {
+        Ok(()) => true,
+        Err(zbus::Error::MethodError(name, _, _))
+            if name.as_str() == "org.freedesktop.systemd1.NoSuchUnit" =>
+        {
+            false
+        }
+        Err(err) => {
+            eprintln!("hibernation resume probe failed: {err:#}");
+            false
+        }
     }
 }

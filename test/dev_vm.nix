@@ -2,6 +2,7 @@
   self,
   nixpkgs,
   system,
+  efiSupport,
 }: let
   config = nixpkgs.lib.nixosSystem {
     modules = [
@@ -9,6 +10,7 @@
       ./configuration.nix
     ];
     specialArgs.flake = self;
+    specialArgs.efiSupport = efiSupport;
   };
   vm = config.config.system.build.vm;
 in {

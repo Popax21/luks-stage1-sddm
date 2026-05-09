@@ -4,15 +4,14 @@
   config,
   flake,
   modulesPath,
+  efiSupport,
   ...
 }: {
   imports = [
     "${modulesPath}/virtualisation/qemu-vm.nix"
     flake.nixosModules.default
   ];
-  config = let
-    sideload = config.boot.initrd.luks.sddmUnlock.sideloadClosure;
-  in {
+  config = {
     system.stateVersion = "24.05";
 
     #Configure the VM
@@ -24,20 +23,37 @@
       resolution.x = 1920;
       resolution.y = 1080;
 
-      diskImage = lib.mkIf (!sideload) null;
+      diskImage = lib.mkIf (!efiSupport) null;
       restrictNetwork = true;
       qemu.options = ["-vga virtio" "-serial stdio"];
 
-      useBootLoader = lib.mkIf sideload true;
-      useEFIBoot = lib.mkIf sideload true;
+      useBootLoader = lib.mkIf efiSupport true;
+      useEFIBoot = lib.mkIf efiSupport true;
     };
     networking.dhcpcd.enable = false;
     services.journald.console = "/dev/ttyS0";
 
-    boot.loader = lib.mkIf sideload {
+    boot.loader = lib.mkIf efiSupport {
       timeout = 0;
       systemd-boot.enable = true;
     };
+
+    #Setup a swap file for hibernation support
+    # - has to be stronger than mkVMOverride (priority 10)
+    swapDevices = lib.mkOverride 5 (
+      lib.optionals efiSupport [
+        {
+          device = "/swapfile";
+          size = config.virtualisation.memorySize;
+        }
+      ]
+    );
+
+    # - ensure that root partition is big enough to hold the swapfile
+    virtualisation.diskSize = lib.mkIf efiSupport (8192 + config.virtualisation.memorySize);
+    virtualisation.fileSystems."/".autoResize = lib.mkIf efiSupport true;
+    boot.growPartition = lib.mkIf efiSupport true;
+    systemd.services.mkswap-swapfile.after = lib.mkIf efiSupport ["growpart.service" "systemd-growfs-root.service"];
 
     #Setup localization to ensure it works in the initrd
     i18n.defaultLocale = "de_AT.UTF-8";
@@ -91,6 +107,13 @@
           before = ["sysroot.mount"];
           requiredBy = ["sysroot.mount"];
         };
+
+        # - "fake" the swap file also being LUKS-encrypted
+        services.systemd-hibernate-resume = lib.mkIf efiSupport {
+          overrideStrategy = "asDropin";
+          after = ["dev-mapper-test\\x2ddrive.device"];
+          requires = ["dev-mapper-test\\x2ddrive.device"];
+        };
       };
       kernelModules = ["loop"];
 
@@ -130,7 +153,7 @@
             [Desktop Entry]
             DesktopNames=FakeDE
             Name=Fake Desktop Environment
-            Exec=sleep 5
+            Exec=${lib.getExe pkgs.cage} -- ${lib.getExe pkgs.foot}
             TryExec=/bin/sh
           '';
         })
@@ -150,23 +173,29 @@
     };
 
     #Enable luks-stage1-sddm
-    boot.initrd.luks.sddmUnlock = {
-      enable = true;
-      users = ["tester" "tester2"];
-      luksDevices = ["test-drive"];
+    boot.initrd.luks.sddmUnlock = lib.mkMerge [
+      {
+        enable = true;
+        users = ["tester" "tester2"];
+        luksDevices = ["test-drive"];
 
-      theme.name = "breeze";
-      # displayDpi = 144; # - 150%
+        theme.name = "breeze";
+        # displayDpi = 144; # - 150%
+      }
 
-      # - non-KMS
-      # displayOutputs."GOP".mode = "1920x1080";
-      # sideloadClosure = true; # - expensive to test!
+      (lib.mkIf efiSupport {
+        # - non-KMS / EFI GOP
+        # displayOutputs."GOP".mode = "1920x1080";
+        # sideloadClosure = true; # - expensive to test!
+      })
 
-      # - KMS
-      kmsModules = ["virtio-gpu"];
-      displayOutputs."Virtual1".mode = "1920x1080";
-      sideloadClosure = false;
-    };
+      (lib.mkIf (!efiSupport) {
+        # - KMS
+        kmsModules = ["virtio-gpu"];
+        displayOutputs."Virtual1".mode = "1920x1080";
+        sideloadClosure = false;
+      })
+    ];
 
     boot.initrd.systemd.services.luks-sddm.environment.RUST_BACKTRACE = "1";
   };

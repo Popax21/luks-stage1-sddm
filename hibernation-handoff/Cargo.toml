@@ -1,0 +1,14 @@
+[package]
+name = "luks-stage1-hibernation-handoff"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "luks-stage1-hibernation-handoff"
+path = "src/main.rs"
+
+[dependencies]
+nix = { version = "0.30.1", features = ["ioctl"] }

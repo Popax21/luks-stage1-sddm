@@ -29,26 +29,34 @@ in {
       unitConfig.SurviveFinalKillSignal = true;
     };
 
-    systemd.services = {
-      # - reclaim the cgroup, otherwise we get sent a SIGTERM from the stage2 systemd manager
-      luks-sddm = {
-        wantedBy = ["graphical.target"]; # - if we're not booting into graphical.target, we still want to get sent a SIGTERM
-        unitConfig.DefaultDependencies = false;
-        serviceConfig.Type = "forking";
-        serviceConfig.KillMode = "mixed";
-        script = "exit";
-      };
+    systemd.services = lib.mkMerge [
+      {
+        # - reclaim the cgroup, otherwise we get sent a SIGTERM from the stage2 systemd manager
+        luks-sddm = {
+          wantedBy = ["graphical.target"]; # - if we're not booting into graphical.target, we still want to get sent a SIGTERM
+          unitConfig.DefaultDependencies = false;
+          serviceConfig.Type = "forking";
+          serviceConfig.KillMode = "mixed";
+          script = "exit";
+        };
 
-      # - once display-manager.service starts, shut down the stage1 SDDM instance
-      #   (we can't use `conflicts = [...];` since that would queue the stop job right away)
-      display-manager.preStart = "systemctl stop luks-sddm.service";
-    };
+        # - once display-manager.service starts, shut down the stage1 SDDM instance
+        #   (we can't use `conflicts = [...];` since that would queue the stop job right away)
+        display-manager.preStart = "systemctl stop luks-sddm.service";
+      }
 
-    #Default kscreenlocker to not re-lock on resume since users already have to enter the LUKS password when resuming
-    environment.etc."xdg/kscreenlockerrc".text = lib.mkDefault ''
-      [Daemon]
-      LockOnResume=false
-    '';
+      (lib.mkIf cfg.hibernationHandoff {
+        luks-sddm-hibernation-handoff = {
+          description = "SDDM Graphical LUKS Unlock - post-hibernation handoff";
+
+          after = ["systemd-hibernate.service" "systemd-suspend-then-hibernate.service" "systemd-hybrid-sleep.service"];
+          requiredBy = ["systemd-hibernate.service" "systemd-suspend-then-hibernate.service" "systemd-hybrid-sleep.service"];
+
+          serviceConfig.Type = "oneshot";
+          serviceConfig.ExecStart = "${lib.getExe' cfg.packages.luks-stage1-sddm "luks-stage1-hibernation-handoff"}";
+        };
+      })
+    ];
 
     #Configure a PAM module to properly perform the handoff
     security.pam.services.sddm-autologin.rules.auth = {

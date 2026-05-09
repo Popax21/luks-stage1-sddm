@@ -284,6 +284,30 @@ list of string
 
 
 
+## boot\.initrd\.luks\.sddmUnlock\.hibernationHandoff
+
+
+
+Auto-unlock the user’s KDE Plasma/… session after resuming from hibernation\.
+
+
+
+*Type:*
+boolean
+
+
+
+*Default:*
+
+```nix
+true
+```
+
+*Declared by:*
+ - [nix/nixos/module\.nix](nix/nixos/module.nix)
+
+
+
 ## boot\.initrd\.luks\.sddmUnlock\.isEfi
 
 

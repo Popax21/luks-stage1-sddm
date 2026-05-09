@@ -66,6 +66,11 @@
       })
     else null;
 
+  blockKmsModule = pkgs.writeShellScript "luks-stage1-sddm-block-kms" ''
+    printf 'luks-stage1-sddm: blocked stage 1 KMS module load: %s\n' "$1" >&2
+    exit 1
+  '';
+
   defaultConfig =
     {
       LUKSUnlock.Greeter = lib.getExe' cfg.packages.sddm-minimal "sddm-greeter-qt6";
@@ -124,6 +129,11 @@ in {
     syncPasswordChanges = lib.mkOption {
       type = lib.types.bool;
       description = "Change the LUKS password when the password of an early-logon user gets changed.";
+      default = true;
+    };
+    hibernationHandoff = lib.mkOption {
+      type = lib.types.bool;
+      description = "Auto-unlock the user's KDE Plasma/... session after resuming from hibernation.";
       default = true;
     };
 
@@ -234,8 +244,7 @@ in {
           description = "SDDM Graphical LUKS Unlock";
 
           after = ["systemd-modules-load.service" "systemd-sysctl.service" "systemd-udevd.service"];
-          before = ["cryptsetup-pre.target" "systemd-ask-password-console.service"] ++ lib.optional (kmsModuleClosure != null) "systemd-hibernate-resume.service";
-          conflicts = lib.optional (kmsModuleClosure != null) "systemd-hibernate-resume.service";
+          before = ["cryptsetup-pre.target" "systemd-ask-password-console.service"];
           wantedBy = ["cryptsetup.target"];
           unitConfig.DefaultDependencies = false;
 
@@ -329,17 +338,19 @@ in {
           script = "systemctl kill --signal=SIGUSR1 luks-sddm.service";
         };
 
-        # - unload KMS modules before hibernation resume so they don't cause problems
-        services.luks-sddm-unload-kms-on-resume = lib.mkIf (kmsModuleClosure != null) {
-          description = "SDDM Graphical LUKS Unlock - hibernation resume KMS module unload";
+        # - stop the SDDM daemon & unload KMS modules before hibernation resume so they don't cause problems
+        services.luks-sddm-pre-hibernation-resume = {
+          description = "SDDM Graphical LUKS Unlock - pre-hibernation resume";
 
-          after = ["luks-sddm.service"];
+          after = ["cryptsetup.target"];
           before = ["systemd-hibernate-resume.service"];
           wantedBy = ["systemd-hibernate-resume.service"];
           unitConfig.DefaultDependencies = false;
 
           serviceConfig.Type = "oneshot";
           script = ''
+            ${config.systemd.package}/bin/systemctl stop luks-sddm.service
+
             for mod in ${lib.escapeShellArgs (lib.unique (cfg.kmsModules ++ cfg.availableKmsModules))}; do
               if [ -d "/sys/module/$mod" ]; then
                 ${lib.getExe' pkgs.kmod "modprobe"} -r "$mod"
@@ -365,8 +376,10 @@ in {
           drmDrivers = ["amdgpu" "radeon" "i915" "xe" "nouveau" "nvidia" "nvidia_drm" "nvidia_modeset" "virtio_gpu" "vmwgfx" "vboxvideo" "hyperv_drm" "qxl" "bochs" "cirrus" "mgag200" "ast" "udl" "gm12u320" "ofdrm" "repaper"];
         in
           lib.mkIf (kmsModuleClosure == null) {
-            text = lib.concatMapStrings (m: "install ${m} ${pkgs.coreutils}/bin/false\n") drmDrivers;
+            text = lib.concatMapStrings (m: "install ${m} ${blockKmsModule} ${m}\n") drmDrivers;
           };
+
+        storePaths = lib.mkIf (kmsModuleClosure == null) [blockKmsModule];
       };
 
       #We need to enable support for some things we need to have early in initrd
