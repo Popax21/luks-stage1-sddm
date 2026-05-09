@@ -44,6 +44,12 @@ in {
       display-manager.preStart = "systemctl stop luks-sddm.service";
     };
 
+    #Default kscreenlocker to not re-lock on resume since users already have to enter the LUKS password when resuming
+    environment.etc."xdg/kscreenlockerrc".text = lib.mkDefault ''
+      [Daemon]
+      LockOnResume=false
+    '';
+
     #Configure a PAM module to properly perform the handoff
     security.pam.services.sddm-autologin.rules.auth = {
       luks-stage1-handoff = {

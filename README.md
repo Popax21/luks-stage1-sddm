@@ -9,6 +9,11 @@ boot.initrd.luks.sddmUnlock = {
     enable = true;
     users = ["yourUser"];
     luksDevices = ["yourDriveLabel"];
+
+    # - display config for non-KMS / EFI GOP
+    displayOutputs.GOP.mode = "1920x1080";
+
+    # - for full KMS display configuration support (requires loading the GPU driver early)
     # NVIDIA: kmsModules = ["nvidia_drm"];
     # AMD: availabeKmsModules = ["amdgpu"]; # - add it to boot.initrd.availableKernelModules instead if you get early_init errors
 };
@@ -34,7 +39,6 @@ As such there should be no circumstances where usage of this module results in y
 ## Configuration options
 
 See [here](MODULE_OPTIONS.md).
-
 
 ## TODO
 

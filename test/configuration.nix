@@ -154,12 +154,18 @@
       enable = true;
       users = ["tester" "tester2"];
       luksDevices = ["test-drive"];
-      kmsModules = ["virtio-gpu"];
-      sideloadClosure = false; # true; # - expensive to test!
 
-      displayOutputs."Virtual1".mode = "1920x1080";
-      # displayDpi = 144; # - 150%
       theme.name = "breeze";
+      # displayDpi = 144; # - 150%
+
+      # - non-KMS
+      # displayOutputs."GOP".mode = "1920x1080";
+      # sideloadClosure = true; # - expensive to test!
+
+      # - KMS
+      kmsModules = ["virtio-gpu"];
+      displayOutputs."Virtual1".mode = "1920x1080";
+      sideloadClosure = false;
     };
 
     boot.initrd.systemd.services.luks-sddm.environment.RUST_BACKTRACE = "1";

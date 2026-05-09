@@ -84,8 +84,8 @@ in {
 
     sideloadClosure = lib.mkOption {
       type = lib.types.bool;
-      default = config.boot.loader.systemd-boot.enable || (config.boot.loader.grub.enable && config.boot.loader.grub.efiSupport);
-      defaultText = lib.literalExpression ''config.boot.loader.systemd-boot.enable || (config.boot.loader.grub.enable && config.boot.loader.grub.efiSupport)'';
+      default = cfg.isEfi;
+      defaultText = lib.literalExpression "config.boot.initrd.luks.sddmUnlock.isEfi";
       description = ''
         Don't store the squashed SDDM closure in the initrd itself, and instead store it directly on the EFI partition.
         This can be used to reduce the size of the generated initrd.

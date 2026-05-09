@@ -7,6 +7,20 @@
   cfg = config.boot.initrd.luks.sddmUnlock;
   dmCfg = config.services.displayManager;
 
+  isValidGOPDisplay = display:
+    lib.all lib.id [
+      (display.mode == null || display.mode == "auto" || (builtins.match "[0-9]+x[0-9]+" display.mode) != null)
+      (display.virtualIndex == null)
+      (display.virtualPos == null)
+    ];
+
+  efiGOPMode = let
+    mode = cfg.displayOutputs.GOP.mode or null;
+  in
+    if kmsModuleClosure == null && mode != "auto"
+    then mode
+    else null;
+
   glibcLocales = pkgs.glibcLocales.override {
     allLocales = false;
     locales = ["C.UTF-8/UTF-8" "${cfg.locale}/UTF-8"];
@@ -113,11 +127,18 @@ in {
       default = true;
     };
 
+    isEfi = lib.mkOption {
+      type = lib.types.bool;
+      description = "Whether the system boots through an EFI bootloader.";
+      default = config.boot.loader.systemd-boot.enable || (config.boot.loader.grub.enable && config.boot.loader.grub.efiSupport);
+      defaultText = lib.literalExpression "config.boot.loader.systemd-boot.enable || (config.boot.loader.grub.enable && config.boot.loader.grub.efiSupport)";
+    };
+
     kmsModules = lib.mkOption {
       type = lib.types.listOf lib.types.str;
       description = "Kernel modules to explicitly load for enabling KMS support. These kernel modules will be stored in the squashed closure.";
       default = [];
-      example = ["nvidia"];
+      example = ["nvidia_drm"];
     };
     availableKmsModules = lib.mkOption {
       type = lib.types.listOf lib.types.str;
@@ -193,6 +214,14 @@ in {
         assertion = cfg.users != [];
         message = "`boot.initrd.luks.sddmUnlock.users` needs to contain at least one user for LUKS stage 1 SDDM unlocking to be enabled.";
       }
+      {
+        assertion = kmsModuleClosure == null -> lib.all lib.id (lib.mapAttrsToList (name: value: name == "GOP" && isValidGOPDisplay value) cfg.displayOutputs);
+        message = "`boot.initrd.luks.sddmUnlock.displayOutputs.GOP` contains invalid settings - only `mode` may be set to either 'auto' or a refresh rate-agnostic resolution specifier.";
+      }
+      {
+        assertion = efiGOPMode != null -> cfg.isEfi;
+        message = "`boot.initrd.luks.sddmUnlock.displayOutputs.GOP.mode` requires an EFI system. Specify a KMS module to load if you wanna set a specific resolution on BIOS systems.";
+      }
     ];
 
     boot.initrd = {
@@ -205,7 +234,8 @@ in {
           description = "SDDM Graphical LUKS Unlock";
 
           after = ["systemd-modules-load.service" "systemd-sysctl.service" "systemd-udevd.service"];
-          before = ["cryptsetup-pre.target" "systemd-ask-password-console.service"];
+          before = ["cryptsetup-pre.target" "systemd-ask-password-console.service"] ++ lib.optional (kmsModuleClosure != null) "systemd-hibernate-resume.service";
+          conflicts = lib.optional (kmsModuleClosure != null) "systemd-hibernate-resume.service";
           wantedBy = ["cryptsetup.target"];
           unitConfig.DefaultDependencies = false;
 
@@ -299,6 +329,25 @@ in {
           script = "systemctl kill --signal=SIGUSR1 luks-sddm.service";
         };
 
+        # - unload KMS modules before hibernation resume so they don't cause problems
+        services.luks-sddm-unload-kms-on-resume = lib.mkIf (kmsModuleClosure != null) {
+          description = "SDDM Graphical LUKS Unlock - hibernation resume KMS module unload";
+
+          after = ["luks-sddm.service"];
+          before = ["systemd-hibernate-resume.service"];
+          wantedBy = ["systemd-hibernate-resume.service"];
+          unitConfig.DefaultDependencies = false;
+
+          serviceConfig.Type = "oneshot";
+          script = ''
+            for mod in ${lib.escapeShellArgs (lib.unique (cfg.kmsModules ++ cfg.availableKmsModules))}; do
+              if [ -d "/sys/module/$mod" ]; then
+                ${lib.getExe' pkgs.kmod "modprobe"} -r "$mod"
+              fi
+            done
+          '';
+        };
+
         #Setup users we should be able to log in as
         users = lib.listToAttrs (lib.imap0
           (idx: name: {
@@ -310,6 +359,14 @@ in {
 
         #Set the timezone (if configured)
         contents."/etc/localtime".source = lib.mkIf (config.time.timeZone != null) "${pkgs.tzdata}/share/zoneinfo/${config.time.timeZone}";
+
+        #Explicitly blacklist DRM / KMS modules if in non-KMS mode so that simpledrm / EFI GOP remains the main display output
+        contents."/etc/modprobe.d/00-luks-stage1-sddm-block-kms.conf" = let
+          drmDrivers = ["amdgpu" "radeon" "i915" "xe" "nouveau" "nvidia" "nvidia_drm" "nvidia_modeset" "virtio_gpu" "vmwgfx" "vboxvideo" "hyperv_drm" "qxl" "bochs" "cirrus" "mgag200" "ast" "udl" "gm12u320" "ofdrm" "repaper"];
+        in
+          lib.mkIf (kmsModuleClosure == null) {
+            text = lib.concatMapStrings (m: "install ${m} ${pkgs.coreutils}/bin/false\n") drmDrivers;
+          };
       };
 
       #We need to enable support for some things we need to have early in initrd
@@ -318,21 +375,26 @@ in {
         overlay = true;
       };
 
-      kernelModules = ["loop"];
+      # - on the simpledrm path, also explicitly load `simpledrm` so that it grabs the
+      #   firmware framebuffer's `simple-framebuffer.0` platform device first
+      kernelModules = ["loop"] ++ lib.optional (kmsModuleClosure == null) "simpledrm";
       availableKernelModules = ["evdev" "overlay"]; # - required for input / etc.
 
-      #Configure the closure of things that are compressed / optionally sideloaded (handled in ./squashed-closure.nix)
+      #Configure infinite retries for all devices we should unlock
+      luks.devices = lib.genAttrs cfg.luksDevices (_: {crypttabExtraOpts = ["tries=0"];});
+
       luks.sddmUnlock = {
+        #Configure the closure of things that are compressed / optionally sideloaded (handled in ./squashed-closure.nix)
         closureContents =
           [glibcLocales cfg.packages.sddm-daemon kmsConfig sddmConfig]
           ++ (lib.optional (kmsModuleClosure != null) kmsModuleClosure)
           ++ (lib.optional (!cfg.theme.qtSwRendering) cfg.packages.mesa-minimal);
 
         extraClosureRules = lib.optional (kmsModuleClosure != null) "!${kmsModuleClosure}/";
-      };
 
-      #Configure infinite retries for all devices we should unlock
-      luks.devices = lib.genAttrs cfg.luksDevices (_: {crypttabExtraOpts = ["tries=0"];});
+        #Disable cursor HW acceleration when using simpledrm (it does not support it)
+        theme.cursorHwAcceleration = lib.mkIf (kmsModuleClosure == null) false;
+      };
     };
 
     #Sync password changes (if enabled)
@@ -348,5 +410,8 @@ in {
         order = config.security.pam.services.${srv}.rules.password.unix.order - 10;
       };
     }));
+
+    #Set the firmware's native framebuffer resolution using the EFI Graphics Output Protocol
+    boot.kernelParams = lib.optional (efiGOPMode != null) "video=efifb:${efiGOPMode}";
   };
 }

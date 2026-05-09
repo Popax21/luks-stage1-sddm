@@ -12,12 +12,18 @@ boolean
 
 
 *Default:*
-` false `
+
+```nix
+false
+```
 
 
 
 *Example:*
-` true `
+
+```nix
+true
+```
 
 *Declared by:*
  - [nix/nixos/module\.nix](nix/nixos/module.nix)
@@ -38,7 +44,10 @@ attribute set
 
 
 *Default:*
-` pkgs.luks-stage1-sddm `
+
+```nix
+pkgs.luks-stage1-sddm
+```
 
 *Declared by:*
  - [nix/nixos/module\.nix](nix/nixos/module.nix)
@@ -57,13 +66,16 @@ list of string
 
 
 *Default:*
-` [ ] `
+
+```nix
+[ ]
+```
 
 
 
 *Example:*
 
-```
+```nix
 [
   "amdgpu"
 ]
@@ -88,7 +100,10 @@ positive integer, meaning >0
 
 
 *Default:*
-` 96 `
+
+```nix
+96
+```
 
 *Declared by:*
  - [nix/nixos/module\.nix](nix/nixos/module.nix)
@@ -109,7 +124,10 @@ attribute set of (submodule)
 
 
 *Default:*
-` { } `
+
+```nix
+{ }
+```
 
 *Declared by:*
  - [nix/nixos/module\.nix](nix/nixos/module.nix)
@@ -130,12 +148,18 @@ null or string
 
 
 *Default:*
-` null `
+
+```nix
+null
+```
 
 
 
 *Example:*
-` "1920x1080" # or: "off", "current", "preferred", "skip", "1920x1080@60", ... `
+
+```nix
+"1920x1080" # or: "off", "current", "preferred", "skip", "1920x1080@60", ...
+```
 
 *Declared by:*
  - [nix/nixos/module\.nix](nix/nixos/module.nix)
@@ -156,7 +180,10 @@ null or (unsigned integer, meaning >=0)
 
 
 *Default:*
-` null `
+
+```nix
+null
+```
 
 *Declared by:*
  - [nix/nixos/module\.nix](nix/nixos/module.nix)
@@ -177,7 +204,10 @@ null or (submodule)
 
 
 *Default:*
-` null `
+
+```nix
+null
+```
 
 *Declared by:*
  - [nix/nixos/module\.nix](nix/nixos/module.nix)
@@ -198,12 +228,18 @@ null or string
 
 
 *Default:*
-` null `
+
+```nix
+null
+```
 
 
 
 *Example:*
-` "/dev/dri/card2" `
+
+```nix
+"/dev/dri/card2"
+```
 
 *Declared by:*
  - [nix/nixos/module\.nix](nix/nixos/module.nix)
@@ -224,13 +260,16 @@ list of string
 
 
 *Default:*
-` [ ] `
+
+```nix
+[ ]
+```
 
 
 
 *Example:*
 
-```
+```nix
 [
   "${somePkg}/excludeFile"
   "!${somePkg}/includeFile"
@@ -242,6 +281,30 @@ list of string
 
 *Declared by:*
  - [nix/nixos/squashed-closure\.nix](nix/nixos/squashed-closure.nix)
+
+
+
+## boot\.initrd\.luks\.sddmUnlock\.isEfi
+
+
+
+Whether the system boots through an EFI bootloader\.
+
+
+
+*Type:*
+boolean
+
+
+
+*Default:*
+
+```nix
+config.boot.loader.systemd-boot.enable || (config.boot.loader.grub.enable && config.boot.loader.grub.efiSupport)
+```
+
+*Declared by:*
+ - [nix/nixos/module\.nix](nix/nixos/module.nix)
 
 
 
@@ -259,15 +322,18 @@ list of string
 
 
 *Default:*
-` [ ] `
+
+```nix
+[ ]
+```
 
 
 
 *Example:*
 
-```
+```nix
 [
-  "nvidia"
+  "nvidia_drm"
 ]
 ```
 
@@ -290,7 +356,10 @@ string
 
 
 *Default:*
-` config.i18n.defaultLocale `
+
+```nix
+config.i18n.defaultLocale
+```
 
 *Declared by:*
  - [nix/nixos/module\.nix](nix/nixos/module.nix)
@@ -308,6 +377,14 @@ There must be a corresponding entry in ` boot.initrd.luks.devices ` for each lis
 
 *Type:*
 list of string
+
+
+
+*Default:*
+
+```nix
+[ ]
+```
 
 *Declared by:*
  - [nix/nixos/module\.nix](nix/nixos/module.nix)
@@ -330,7 +407,10 @@ null or (function that evaluates to a(n) (attribute set))
 
 
 *Default:*
-` null `
+
+```nix
+null
+```
 
 *Declared by:*
  - [nix/nixos/squashed-closure\.nix](nix/nixos/squashed-closure.nix)
@@ -351,7 +431,10 @@ boolean
 
 
 *Default:*
-` true `
+
+```nix
+true
+```
 
 *Declared by:*
  - [nix/nixos/squashed-closure\.nix](nix/nixos/squashed-closure.nix)
@@ -372,7 +455,10 @@ attribute set of section of an INI file (attrs of INI atom (null, bool, int, flo
 
 
 *Default:*
-` { } `
+
+```nix
+{ }
+```
 
 *Declared by:*
  - [nix/nixos/module\.nix](nix/nixos/module.nix)
@@ -394,7 +480,10 @@ boolean
 
 
 *Default:*
-` config.boot.loader.systemd-boot.enable || (config.boot.loader.grub.enable && config.boot.loader.grub.efiSupport) `
+
+```nix
+config.boot.initrd.luks.sddmUnlock.isEfi
+```
 
 *Declared by:*
  - [nix/nixos/squashed-closure\.nix](nix/nixos/squashed-closure.nix)
@@ -415,7 +504,10 @@ boolean
 
 
 *Default:*
-` true `
+
+```nix
+true
+```
 
 *Declared by:*
  - [nix/nixos/module\.nix](nix/nixos/module.nix)
@@ -436,7 +528,10 @@ list of package
 
 
 *Default:*
-` [ ] `
+
+```nix
+[ ]
+```
 
 *Declared by:*
  - [nix/nixos/theming\.nix](nix/nixos/theming.nix)
@@ -457,7 +552,10 @@ boolean
 
 
 *Default:*
-` config.boot.initrd.luks.sddmUnlock.theme.name == "breeze" `
+
+```nix
+config.boot.initrd.luks.sddmUnlock.theme.name == "breeze"
+```
 
 *Declared by:*
  - [nix/nixos/breeze-fixups\.nix](nix/nixos/breeze-fixups.nix)
@@ -478,7 +576,10 @@ boolean
 
 
 *Default:*
-` true `
+
+```nix
+true
+```
 
 *Declared by:*
  - [nix/nixos/theming\.nix](nix/nixos/theming.nix)
@@ -499,7 +600,10 @@ null or string
 
 
 *Default:*
-` null `
+
+```nix
+null
+```
 
 *Declared by:*
  - [nix/nixos/theming\.nix](nix/nixos/theming.nix)
@@ -520,7 +624,10 @@ signed integer
 
 
 *Default:*
-` 32 `
+
+```nix
+32
+```
 
 *Declared by:*
  - [nix/nixos/theming\.nix](nix/nixos/theming.nix)
@@ -541,13 +648,16 @@ attribute set of list of string
 
 
 *Default:*
-` { } `
+
+```nix
+{ }
+```
 
 
 
 *Example:*
 
-```
+```nix
 {
   emoji = [
     "Noto Color Emoji"
@@ -583,13 +693,16 @@ attribute set of string
 
 
 *Default:*
-` { } `
+
+```nix
+{ }
+```
 
 
 
 *Example:*
 
-```
+```nix
 {
   QT_QPA_SYSTEM_ICON_THEME = "breeze";
 }
@@ -614,13 +727,16 @@ list of string
 
 
 *Default:*
-` [ ] `
+
+```nix
+[ ]
+```
 
 
 
 *Example:*
 
-```
+```nix
 [
   "/share/plasma/desktoptheme/default"
   "/share/icons/breeze"
@@ -646,13 +762,16 @@ attribute set of strings concatenated with “\\n”
 
 
 *Default:*
-` { } `
+
+```nix
+{ }
+```
 
 
 
 *Example:*
 
-```
+```nix
 {
   "some/directory/" = "echo 'hi' >> $target";
   "some/file" = "rm $target";
@@ -678,7 +797,10 @@ list of package
 
 
 *Default:*
-` [ ] `
+
+```nix
+[ ]
+```
 
 *Declared by:*
  - [nix/nixos/theming\.nix](nix/nixos/theming.nix)
@@ -699,7 +821,10 @@ string
 
 
 *Default:*
-` config.services.displayManager.sddm.theme `
+
+```nix
+config.services.displayManager.sddm.theme
+```
 
 *Declared by:*
  - [nix/nixos/theming\.nix](nix/nixos/theming.nix)
@@ -720,13 +845,16 @@ attribute set of package
 
 
 *Default:*
-` { } `
+
+```nix
+{ }
+```
 
 
 
 *Example:*
 
-```
+```nix
 {
   "org.kde.ksvg" = pkgs.luks-stag1-sddm.kde-minimal.ksvg;
 }
@@ -751,7 +879,10 @@ boolean
 
 
 *Default:*
-` false `
+
+```nix
+false
+```
 
 *Declared by:*
  - [nix/nixos/theming\.nix](nix/nixos/theming.nix)
@@ -774,7 +905,10 @@ boolean
 
 
 *Default:*
-` false `
+
+```nix
+false
+```
 
 *Declared by:*
  - [nix/nixos/theming\.nix](nix/nixos/theming.nix)
@@ -795,7 +929,10 @@ boolean
 
 
 *Default:*
-` true `
+
+```nix
+true
+```
 
 *Declared by:*
  - [nix/nixos/theming\.nix](nix/nixos/theming.nix)
@@ -812,6 +949,14 @@ Users which should be available to log in as\.
 
 *Type:*
 list of string
+
+
+
+*Default:*
+
+```nix
+[ ]
+```
 
 *Declared by:*
  - [nix/nixos/module\.nix](nix/nixos/module.nix)
