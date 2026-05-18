@@ -45,15 +45,15 @@ fn has_efivarfs() -> Result<bool> {
 }
 
 fn clear_immutable_flag(path: &Path) -> Result<()> {
-    nix::ioctl_read!(fs_ioc_getflags, b'f', 1, nix::libc::c_int);
-    nix::ioctl_write_ptr!(fs_ioc_setflags, b'f', 2, nix::libc::c_int);
+    nix::ioctl_read!(fs_ioc_getflags, b'f', 1, nix::libc::c_long);
+    nix::ioctl_write_ptr!(fs_ioc_setflags, b'f', 2, nix::libc::c_long);
 
-    const FS_IMMUTABLE_FL: nix::libc::c_int = 0x10;
+    const FS_IMMUTABLE_FL: nix::libc::c_long = 0x10;
 
     //Clear the immutable flag from the file (if set)
     let file = std::fs::File::open(path)?;
 
-    let mut flags: nix::libc::c_int = 0;
+    let mut flags: nix::libc::c_long = 0;
     unsafe { fs_ioc_getflags(file.as_raw_fd(), &mut flags) }?;
 
     if flags & FS_IMMUTABLE_FL != 0 {
