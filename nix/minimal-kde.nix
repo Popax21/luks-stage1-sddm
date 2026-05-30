@@ -9,6 +9,7 @@
   runCommandLocal,
   noto-fonts,
   hack-font,
+  util-linux,
   ...
 }: let
   qt6Packages' = qt6Packages.overrideScope (_: _: qt6-minimal);
@@ -25,6 +26,7 @@ in
     });
     kcoreaddons = prev.kcoreaddons.overrideAttrs (old: {
       cmakeFlags = (old.cmakeFlags or []) ++ ["-DUSE_DBUS=OFF"];
+      buildInputs = (old.buildInputs or []) ++ [util-linux.dev];
     });
     kguiaddons = prev.kguiaddons.overrideAttrs (old: {
       cmakeFlags = (old.cmakeFlags or []) ++ ["-DUSE_DBUS=OFF" "-DWITH_X11=OFF" "-DWITH_WAYLAND=OFF" "-DBUILD_PYTHON_BINDINGS=OFF"];

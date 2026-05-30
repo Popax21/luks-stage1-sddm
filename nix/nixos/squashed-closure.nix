@@ -207,9 +207,9 @@ in {
     );
 
     #Pin the initrd closure packages (if enabled)
-    nixpkgs.overlays = lib.optional (cfg.pinPkgs != null) (final: prev: {
+    nixpkgs.overlays = lib.mkAfter (lib.optional (cfg.pinPkgs != null) (final: prev: {
       luks-stage1-sddm = lib.makeScope (cfg.pinPkgs final.stdenv.targetPlatform.system).newScope prev.luks-stage1-sddm.packages;
-    });
+    }));
 
     #Keep the closure build dependencies alive (if enabled)
     system.extraDependencies = cfg.closureBuildDeps;
