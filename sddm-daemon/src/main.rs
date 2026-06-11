@@ -45,21 +45,11 @@ fn main() -> ExitCode {
         }
     };
 
-    //Pivot/chroot into /sysroot once it's mounted
-    let sysroot_pivot_task = smol::spawn(async move {
-        // - wait for a SIGUSR1 signal which tells us that /sysroot was successfully mounted
-        async_signal::Signals::new([async_signal::Signal::Usr1])
-            .expect("failed to register SIGUSR1 signal handler")
-            .next()
-            .await
-            .unwrap()
-            .expect("failed to wait for SIGUSR1");
+    //Enter a private mount namespace so we can properly survive the sysroot pivot
+    unshare_mount_ns().expect("failed to unshare mount NS");
 
-        eprintln!("got SIGUSR1 - pivoting into /sysroot");
-
-        std::env::set_current_dir("/sysroot").expect("failed to chdir into sysroot");
-        std::os::unix::fs::chroot(".").expect("failed to chroot into sysroot");
-    });
+    // - the closure tells us whether we are using a nullfs rootfs (which leaves the initrd intact)
+    let initrd_survives_pivot = std::env::var("INITRD_SURVIVES_PIVOT").as_deref() == Ok("true");
 
     //Start listening for password requests from systemd
     smol::block_on(async {
@@ -127,6 +117,10 @@ fn main() -> ExitCode {
             cmd.spawn().expect("failed to start SDDM greeter")
         };
 
+        //Pivot/chroot into /sysroot once it's mounted (if needed)
+        let sysroot_pivot_task =
+            smol::spawn(handle_sysroot_pivot(greeter.id(), initrd_survives_pivot));
+
         //Wait until we receive a SIGTERM / SIGINT signal, or the greeter finishes
         let mut signals =
             async_signal::Signals::new([async_signal::Signal::Term, async_signal::Signal::Int])
@@ -165,7 +159,7 @@ fn main() -> ExitCode {
         if !failsafe_engaged && let Some(request) = controller.shutdown().await {
             //We got a pending login request before shutting down; prepare for a handoff to the proper SDDM service
             if sysroot_pivot_task.is_finished() {
-                write_transient_sddm_config(&request)
+                write_transient_sddm_config(&request, initrd_survives_pivot)
                     .expect("failed to write transient SDDM config");
 
                 println!(
@@ -210,6 +204,78 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     })
+}
+
+fn unshare_mount_ns() -> nix::Result<()> {
+    use nix::mount::{MsFlags, mount};
+    use nix::sched::{CloneFlags, unshare};
+
+    //Unshare the mount namespace
+    unshare(CloneFlags::CLONE_NEWNS)?;
+
+    //Setup mount propagation - inherit mounts from the host, but not the other way around
+    mount(
+        None::<&str>,
+        "/",
+        None::<&str>,
+        MsFlags::MS_REC | MsFlags::MS_SLAVE,
+        None::<&str>,
+    )
+}
+
+async fn handle_sysroot_pivot(greeter_pid: u32, initrd_survives_pivot: bool) {
+    use nix::mount::{MsFlags, mount};
+
+    //Wait for a SIGUSR1 signal which tells us that /sysroot was successfully mounted
+    async_signal::Signals::new([async_signal::Signal::Usr1])
+        .expect("failed to register SIGUSR1 signal handler")
+        .next()
+        .await
+        .unwrap()
+        .expect("failed to wait for SIGUSR1");
+
+    eprintln!("got SIGUSR1 - preparing for /sysroot pivot");
+
+    //Detach our mount NS so we are isolated from systemd switch-root
+    mount(
+        None::<&str>,
+        "/",
+        None::<&str>,
+        MsFlags::MS_REC | MsFlags::MS_PRIVATE,
+        None::<&str>,
+    )
+    .expect("failed to detach mount namespace");
+
+    if initrd_survives_pivot {
+        // - this is a modern system with a nullfs rootfs -> systemd leaves the initrd intact
+        eprintln!(" - initrd survives /sysroot pivot, no need to pivot ourselves");
+        return;
+    }
+
+    //Otherwise, systemd wipes the initrd, so we need to chroot to have a functional / root
+
+    // - remount our view of the post-pivot Nix store to also include the closure overlay
+    // - this does not include paths from the initrd, so best effort
+    if let Err(err) = mount(
+        Some("overlay"),
+        "/sysroot/nix/store",
+        Some("overlay"),
+        MsFlags::empty(),
+        Some("lowerdir=/sysroot/nix/store:/nix/store"),
+    ) {
+        eprintln!("failed to overlay SDDM closure onto /sysroot: {err}");
+    }
+
+    // - chroot ourselves into the new root
+    std::env::set_current_dir("/sysroot").expect("failed to chdir into sysroot");
+    std::os::unix::fs::chroot(".").expect("failed to chroot into sysroot");
+
+    // - relay the pivot signal to the greeter
+    nix::sys::signal::kill(
+        nix::unistd::Pid::from_raw(greeter_pid as i32),
+        nix::sys::signal::Signal::SIGUSR1,
+    )
+    .expect("failed to relay pivot signal to greeter");
 }
 
 fn claim_tty() -> std::io::Result<std::fs::File> {

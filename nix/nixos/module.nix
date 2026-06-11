@@ -288,6 +288,15 @@ in {
           '';
 
           environment = lib.mkMerge [
+            # - tell the daemon whether the initrd survives the pivot
+            {
+              #Recent kernels (Linux 7.0+) have the rootfs be a nullfs, which makes recent systemd >= 260 not wipe the initrd
+              INITRD_SURVIVES_PIVOT = lib.boolToString (lib.all lib.id [
+                (lib.versionAtLeast config.boot.kernelPackages.kernel.version "7.0")
+                (lib.versionAtLeast config.boot.initrd.systemd.package.version "260")
+              ]);
+            }
+
             # - configure the embedded QT backend
             (
               if !cfg.theme.qtSwRendering
@@ -335,7 +344,7 @@ in {
           unitConfig.DefaultDependencies = false;
 
           serviceConfig.Type = "oneshot";
-          script = "systemctl kill --signal=SIGUSR1 luks-sddm.service";
+          script = "systemctl kill --signal=SIGUSR1 --kill-whom=main luks-sddm.service";
         };
 
         # - stop the SDDM daemon & unload KMS modules before hibernation resume so they don't cause problems

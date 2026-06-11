@@ -50,11 +50,17 @@ impl SddmConfig {
     }
 }
 
-pub fn write_transient_sddm_config(request: &LoginRequest) -> Result<()> {
+pub fn write_transient_sddm_config(request: &LoginRequest, prefix_sysroot: bool) -> Result<()> {
     use std::io::Write;
 
     let Some(file) = std::option_env!("TRANSIENT_SDDM_CONF") else {
         return Ok(());
+    };
+
+    let file = if prefix_sysroot {
+        Path::new("/sysroot").join(file.trim_start_matches('/'))
+    } else {
+        PathBuf::from(file)
     };
 
     //Save the password into the user / root keyring
