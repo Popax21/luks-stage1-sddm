@@ -7,7 +7,6 @@
   harfbuzz,
   freetype,
   fontconfig,
-  icu,
   libjpeg,
   libpng,
   pcre2,
@@ -37,7 +36,6 @@
       harfbuzz
       freetype
       fontconfig
-      icu
       libjpeg
       libpng
       pcre2
@@ -87,6 +85,7 @@
         "printsupport"
         "testlib"
         "vnc"
+        "icu"
 
         # - unused widgets; mdiarea+syntaxhighlighter also skip the linguist GUI
         #   (which fails to link QtNetwork upstream)
