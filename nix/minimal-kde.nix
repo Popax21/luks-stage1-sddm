@@ -79,6 +79,8 @@ in
       postPatch = ''
         ln -sf ${patches/plasma-workspace-CMakeLists.txt} CMakeLists.txt
         find libclock -type f -exec sed -i '/DBus/d;/sessionBus/d' {} \;
+        sed -i '\|#include <Plasma/Plasma>|d' lookandfeel/components/componentsplugin.cpp
+        sed -i '/target_link_libraries(components PRIVATE Plasma::Plasma)/d' lookandfeel/CMakeLists.txt
       '';
       postInstall = "";
       postFixup = "";

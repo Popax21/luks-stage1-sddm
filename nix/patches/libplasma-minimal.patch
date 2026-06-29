@@ -1,24 +1,31 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 714974abd..cec4bc26b 100644
+index 7538f91..853952c 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -46,3 +46,3 @@ ecm_setup_version(PROJECT
+@@ -41,7 +41,7 @@ ecm_setup_version(PROJECT
+ 
+ ################# now find all used packages #################
  
 -find_package(Qt6 ${QT_MIN_VERSION} REQUIRED NO_MODULE COMPONENTS Quick Gui Qml Svg QuickControls2 DBus)
 +find_package(Qt6 ${QT_MIN_VERSION} REQUIRED NO_MODULE COMPONENTS Quick Gui Qml Svg QuickControls2)
  
-@@ -56,3 +56,2 @@ find_package(KF6 ${KF6_MIN_VERSION} REQUIRED
+ if (Qt6Gui_VERSION VERSION_GREATER_EQUAL "6.10.0")
+     find_package(Qt6GuiPrivate ${QT_MIN_VERSION} REQUIRED NO_MODULE)
+@@ -51,25 +51,13 @@ find_package(KF6 ${KF6_MIN_VERSION} REQUIRED
+     COMPONENTS
+         Config
          CoreAddons
 -        GlobalAccel
          GuiAddons
-@@ -60,6 +59,2 @@ find_package(KF6 ${KF6_MIN_VERSION} REQUIRED
+         I18n
          IconThemes
 -        KIO
 -        WindowSystem
 -        Notifications
 -        Package
          KirigamiPlatform
-@@ -68,8 +63,2 @@ find_package(KF6 ${KF6_MIN_VERSION} REQUIRED
+         Svg
+         ColorScheme
  )
 -find_package(PlasmaActivities REQUIRED ${PROJECT_DEP_VERSION})
 -
@@ -26,32 +33,45 @@ index 714974abd..cec4bc26b 100644
 -find_package(PlasmaWaylandProtocols 1.10.0 REQUIRED)
 -find_package(Qt6WaylandClient ${QT_MIN_VERSION} REQUIRED CONFIG)
 -find_package(Wayland 1.9 REQUIRED Client)
+-find_package(WaylandProtocols 1.46 REQUIRED)
  
+ option(WITHOUT_X11 "Build without X11 support (skips finding X11)." OFF)
+ if(NOT WITHOUT_X11)
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index e82503e70..c59fc6d60 100644
+index e82503e..c59fc6d 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -3,3 +3,2 @@ add_subdirectory(plasma)
+@@ -1,7 +1,6 @@
+ add_subdirectory(desktoptheme)
+ add_subdirectory(plasma)
  add_subdirectory(declarativeimports)
 -add_subdirectory(plasmaquick)
  
+ ecm_qt_install_logging_categories(
+     EXPORT PLASMA
 diff --git a/src/declarativeimports/core/CMakeLists.txt b/src/declarativeimports/core/CMakeLists.txt
-index cf0bf03e2..355873cfe 100644
+index ea1a0f6..345f302 100644
 --- a/src/declarativeimports/core/CMakeLists.txt
 +++ b/src/declarativeimports/core/CMakeLists.txt
-@@ -13,5 +13,2 @@ target_sources(corebindingsplugin PRIVATE
+@@ -11,15 +11,9 @@ ecm_add_qml_module(corebindingsplugin URI "org.kde.plasma.core" VERSION 2.0 DEPE
+ target_sources(corebindingsplugin PRIVATE
+     action.cpp
      corebindingsplugin.cpp
 -    tooltiparea.cpp
 -    tooltipdialog.cpp
 -    windowthumbnail.cpp
  
-@@ -19,5 +16,2 @@ target_sources(corebindingsplugin PRIVATE
+     action.h
      corebindingsplugin.h
 -    tooltiparea.h
 -    tooltipdialog.h
 -    windowthumbnail.h
      ${RESOURCES}
-@@ -37,7 +31,4 @@ target_link_libraries(corebindingsplugin PRIVATE
+ )
+ 
+@@ -35,11 +29,8 @@ target_link_libraries(corebindingsplugin PRIVATE
+         KF6::IconThemes
+         KF6::I18n
          Qt6::Svg
 -        KF6::WindowSystem
          KF6::I18nQml
@@ -59,38 +79,117 @@ index cf0bf03e2..355873cfe 100644
 -        Plasma::PlasmaQuick
 -        Wayland::Client
  )
+ 
+ if(HAVE_X11)
 diff --git a/src/declarativeimports/core/corebindingsplugin.cpp b/src/declarativeimports/core/corebindingsplugin.cpp
-index 8c8db7c86..9fdbaf514 100644
+index 8c8db7c..9fdbaf5 100644
 --- a/src/declarativeimports/core/corebindingsplugin.cpp
 +++ b/src/declarativeimports/core/corebindingsplugin.cpp
-@@ -14,2 +14,4 @@
+@@ -12,10 +12,13 @@
+ #include <QDebug>
+ #include <QQmlContext>
  #include <QWindow>
 +#include <QQuickItem>
 +#include <QQuickWindow>
  
-@@ -18,2 +20,3 @@
+ #include <KLocalizedContext>
+ 
  #include "action.h"
 +#include "theme.h"
  #include <KLocalizedQmlContext>
+ 
+ void CoreBindingsPlugin::initializeEngine(QQmlEngine *engine, const char *uri)
 diff --git a/src/declarativeimports/core/corebindingsplugin.h b/src/declarativeimports/core/corebindingsplugin.h
-index 532ee2aed..b41c009f8 100644
+index 3b39294..5e1f7e0 100644
 --- a/src/declarativeimports/core/corebindingsplugin.h
 +++ b/src/declarativeimports/core/corebindingsplugin.h
-@@ -19,7 +19,2 @@
+@@ -18,12 +18,6 @@
+ #include <qqmlintegration.h>
+ 
  #include "action.h"
 -#include "applet.h"
 -#include "appletpopup.h"
 -#include "containment.h"
 -#include "corona.h"
 -#include "dialog.h"
+-#include "edgeeventforwarder.h"
  
-@@ -38,46 +33,2 @@ struct PropertyMapForeign {
+ struct TypesForeign {
+     Q_GADGET
+@@ -38,200 +32,6 @@ struct PropertyMapForeign {
+     QML_FOREIGN(QQmlPropertyMap)
+ };
  
+-/*!
+- * \qmltype Window
+- * \inqmlmodule org.kde.plasma.core
+- * \nativetype PlasmaQuick::PlasmaWindow
+- *
+- * \brief Creates a QQuickWindow themed in a Plasma style with background.
+- */
+-
+-/*!
+- * \qmlproperty Item Window::mainItem
+- *
+- * The main QML item that will be displayed in the Dialog
+- */
+-
+-/*!
+- * \qmlproperty BackgroundHints Window::backgroundHints
+- *
+- * Defines the background used for the window
+- */
+-
+-/*!
+- * \qmlproperty real Window::topPadding
+- */
+-
+-/*!
+- * \qmlproperty real Window::bottomPadding
+- */
+-
+-/*!
+- * \qmlproperty real Window::leftPadding
+- */
+-
+-/*!
+- * \qmlproperty real Window::rightPadding
+- */
+-
 -struct PlasmaWindowForeign {
 -    Q_GADGET
 -    QML_NAMED_ELEMENT(Window)
 -    QML_FOREIGN(PlasmaQuick::PlasmaWindow)
 -};
+-
+-/*!
+- * \qmltype AppletPopup
+- * \inqmlmodule org.kde.plasma.core
+- * \inherits PopupPlasmaWindow
+- * \nativetype PlasmaQuick::AppletPopup
+- *
+- * \brief Shows a popup for an applet either in the panel or on the desktop.
+- *
+- * In addition to the new API this class is resizable and can forward any input events received
+- * on the margin to the main item
+- *
+- * Size hints are transferred from the mainItem's size hints.
+- *
+- */
+-
+-/*!
+- * \qmlproperty Item AppletPopup::appletInterface
+- *
+- * This property holds a pointer to the AppletInterface used by
+- */
+-
+-/*!
+- * \qmlproperty bool AppletPopup::hideOnWindowDeactivate
+- *
+- * Whether the dialog should be hidden when the dialog loses focus.
+- *
+- * The default value is \c false.
+- */
 -
 -struct AppletPopupForeign {
 -    Q_GADGET
@@ -98,11 +197,96 @@ index 532ee2aed..b41c009f8 100644
 -    QML_FOREIGN(PlasmaQuick::AppletPopup)
 -};
 -
+-/*!
+- * \qmltype PopupPlasmaWindow
+- * \inqmlmodule org.kde.plasma.core
+- * \nativetype PlasmaQuick::PopupPlasmaWindow
+- *
+- * \brief Styled Plasma window that can be positioned
+- * relative to an existing Item on another window.
+- *
+- * When shown the popup is placed correctly.
+- *
+- * On Wayland this is currently an XdgTopLevel with the PlasmaShellSurface used on top.
+- * Do not rely on that implementation detail.
+- */
+-
+-/*!
+- * \qmlproperty Item PopupPlasmaWindow::visualParent
+- * The anchor item to place the popup relative to.
+- */
+-
+-/*!
+- * \qmlproperty Qt.Edge PopupPlasmaWindow::popupDirection
+- * Defines the default direction to place the popup relative to the visualParent.
+- */
+-
+-/*!
+- * \qmlproperty Qt.Edge PopupPlasmaWindow::effectivePopupDirection
+- * Defines the direction the popup was placed relative to the visualParent.
+- * This property is read-only and is updated when the popup is shown.
+- * The value whilst the popup is hidden is undefined.
+- */
+-
+-/*!
+- * \qmlproperty bool PopupPlasmaWindow::floating
+- * Defines whether the popup can appear (float) over the parent window. The default is false.
+- */
+-
+-/*!
+- * \qmlproperty bool PopupPlasmaWindow::animated
+- * Defines whether the popup is animated on show and close. The default is false.
+- */
+-
+-/*!
+- * \qmlproperty RemoveBorders PopupPlasmaWindow::removeBorderStrategy
+- * Defines which borders should be enabled/disabled when the popup is shown. The default is to show all borders
+- */
+-
+-/*!
+- * \qmlproperty int PopupPlasmaWindow::margin
+- * If set provides a gap between the parent window and all screen edges
+- */
+-
 -struct PopupPlasmaWindowForeign {
 -    Q_GADGET
 -    QML_NAMED_ELEMENT(PopupPlasmaWindow)
 -    QML_FOREIGN(PlasmaQuick::PopupPlasmaWindow)
 -};
+-
+-/*!
+- * \qmltype Dialog
+- * \inqmlmodule org.kde.plasma.core
+- * \nativetype PlasmaQuick::Dialog
+- * \inherits QtQuick.Window
+- *
+- * \brief Creates a Plasma themed top level window that can contain any QML component.
+- *
+- * It can be automatically positioned relative to a visual parent
+- * The dialog will resize to the size of the main item
+- *
+- * \qml
+- *  import QtQuick 2.0
+- *  import org.kde.plasma.core as PlasmaCore
+- *  Item {
+- *     PlasmaCore.Dialog {
+- *          visible: true
+- *          mainItem: Item {
+- *              width: 500
+- *              height: 500
+- *
+- *              Text {
+- *                  anchors.centerIn: parent
+- *                  color: "red"
+- *                  text: "text"
+- *              }
+- *          }
+- *      }
+- * }
+- * \endqml
+- */
+-
+-// TODO QML documentation for dialog
 -
 -struct DialogForeign {
 -    Q_GADGET
@@ -131,35 +315,65 @@ index 532ee2aed..b41c009f8 100644
 -};
 -
  struct ActionForeign {
+     Q_GADGET
+     QML_NAMED_ELEMENT(Action)
+@@ -251,11 +51,6 @@ struct IconForeign {
+     QML_FOREIGN(QIcon)
+ };
+ 
+-struct EdgeEventForwarderForeign {
+-    Q_GADGET
+-    QML_NAMED_ELEMENT(EdgeEventForwarder)
+-    QML_FOREIGN(PlasmaQuick::EdgeEventForwarder)
+-};
+ 
+ class CoreBindingsPlugin : public QQmlExtensionPlugin
+ {
 diff --git a/src/declarativeimports/plasmaextracomponents/CMakeLists.txt b/src/declarativeimports/plasmaextracomponents/CMakeLists.txt
-index 1a7827819..99c8aec15 100644
+index 0e104f6..401a0b5 100644
 --- a/src/declarativeimports/plasmaextracomponents/CMakeLists.txt
 +++ b/src/declarativeimports/plasmaextracomponents/CMakeLists.txt
-@@ -43,3 +43,2 @@ target_link_libraries(plasmaextracomponentsplugin PRIVATE
+@@ -42,7 +42,6 @@ target_link_libraries(plasmaextracomponentsplugin PRIVATE
+         Qt6::Quick
+         Qt6::Qml
          Qt6::Widgets
 -        KF6::WidgetsAddons
          Plasma::Plasma)
+ 
+ ecm_finalize_qml_module(plasmaextracomponentsplugin DESTINATION ${KDE_INSTALL_QMLDIR})
 diff --git a/src/declarativeimports/plasmaextracomponents/qmenu.cpp b/src/declarativeimports/plasmaextracomponents/qmenu.cpp
-index fe8f8e572..c10ae07ee 100644
+index fe8f8e5..c10ae07 100644
 --- a/src/declarativeimports/plasmaextracomponents/qmenu.cpp
 +++ b/src/declarativeimports/plasmaextracomponents/qmenu.cpp
-@@ -16,3 +16,2 @@
+@@ -14,7 +14,6 @@
+ #include <QQuickWindow>
+ #include <QScreen>
  
 -#include <KAcceleratorManager>
  #include <optional>
-@@ -35,3 +34,2 @@ QMenuProxy::QMenuProxy(QObject *parent)
+ 
+ #include "plasma.h"
+@@ -33,7 +32,6 @@ QMenuProxy::QMenuProxy(QObject *parent)
+         // flag makes no difference anymore (Bug 385311)
+         m_menu->setAttribute(Qt::WA_TranslucentBackground);
  
 -        KAcceleratorManager::manage(m_menu);
          connect(m_menu, &QMenu::triggered, this, &QMenuProxy::itemTriggered);
+         connect(m_menu, &QMenu::aboutToHide, this, [this]() {
+             m_status = Closed;
 diff --git a/src/plasma/CMakeLists.txt b/src/plasma/CMakeLists.txt
-index 37c4079ec..25cca57c9 100644
+index c4fb1fc..bf07a25 100644
 --- a/src/plasma/CMakeLists.txt
 +++ b/src/plasma/CMakeLists.txt
-@@ -1,3 +1 @@
+@@ -1,5 +1,3 @@
 -add_subdirectory(packagestructure)
 -
  # Consumer's include dir which has to be explicitly used to make headers of this lib visible to documented includes
-@@ -23,11 +21,2 @@ target_sources(Plasma PRIVATE
+ # Results in duplicate of prefix-dir & C++ namespace below, but part of different things, so by design:
+ # <visibility-layer>/<C++ namespace>/class header files
+@@ -21,42 +19,16 @@ set_target_properties(Plasma PROPERTIES
+ target_sources(Plasma PRIVATE
+ #global
      plasma.cpp
 -    pluginloader.cpp
 -
@@ -171,7 +385,8 @@ index 37c4079ec..25cca57c9 100644
 -    private/applet_p.cpp
 -    private/containment_p.cpp
  
-@@ -36,14 +25,4 @@ target_sources(Plasma PRIVATE
+ #graphics
+     theme.cpp
      private/theme_p.cpp
 -    private/blureffectwatcher.cpp
  
@@ -186,25 +401,28 @@ index 37c4079ec..25cca57c9 100644
 -    private/applet_p.h
 -    private/containment_p.h
  
-@@ -52,3 +31,2 @@ target_sources(Plasma PRIVATE
+ #graphics
+     theme.h
      private/theme_p.h
 -    private/blureffectwatcher_p.h
- )
-@@ -58,7 +36,3 @@ if (Qt6_VERSION VERSION_GREATER_EQUAL "6.8.0")
- endif()
--qt6_generate_wayland_protocol_client_sources(Plasma
--    ${private_code_option}
--    FILES
--        ${PLASMA_WAYLAND_PROTOCOLS_DIR}/blur.xml
 -)
-+
+-
+-qt6_generate_wayland_protocol_client_sources(Plasma
+-    PRIVATE_CODE
+-    FILES
+-        ${WaylandProtocols_DATADIR}/staging/ext-background-effect/ext-background-effect-v1.xml
+ )
  
-@@ -97,3 +71,3 @@ PRIVATE
+ ecm_qt_declare_logging_category(Plasma
+@@ -92,22 +64,16 @@ PUBLIC
+     KF6::KirigamiPlatform
+ PRIVATE
      Qt6::Quick
 -    Qt6::WaylandClient
 +    Qt6::Widgets
      KF6::ConfigGui
-@@ -102,7 +76,3 @@ PRIVATE
+     KF6::ColorScheme
+     KF6::ConfigQml
      KF6::I18n
 -    KF6::WindowSystem #compositingActive
 -    KF6::GlobalAccel #Applet::setGlobalShortcut
@@ -212,48 +430,71 @@ index 37c4079ec..25cca57c9 100644
      KF6::IconThemes
 -    Plasma::Activities
      KF6::Svg
-@@ -111,4 +81,2 @@ PRIVATE
+     ${PLASMA_EXTRA_LIBS}
+ )
  
 -target_link_libraries(Plasma PRIVATE KF6::Package)
 -
  set(Plasma_BUILD_INCLUDE_DIRS
+     ${CMAKE_CURRENT_SOURCE_DIR}/..
+     ${CMAKE_CURRENT_BINARY_DIR}
 diff --git a/src/plasma/plasma.cpp b/src/plasma/plasma.cpp
-index 2d70601c9..1e3366d8f 100644
+index a90d62a..30f82e4 100644
 --- a/src/plasma/plasma.cpp
 +++ b/src/plasma/plasma.cpp
-@@ -12,4 +12,2 @@
+@@ -12,8 +12,6 @@
+ #include <QQmlComponent>
+ #include <QQmlEngine>
  
 -#include "containment.h"
 -
  namespace Plasma
+ {
+ Types::Types(QObject *parent)
 diff --git a/src/plasma/private/theme_p.cpp b/src/plasma/private/theme_p.cpp
-index 6e0e25821..0f548467b 100644
+index 6e0e258..0f54846 100644
 --- a/src/plasma/private/theme_p.cpp
 +++ b/src/plasma/private/theme_p.cpp
-@@ -17,5 +17,2 @@
+@@ -15,16 +15,11 @@
+ 
+ #include <KIconLoader>
  #include <KSharedConfig>
 -#include <KWindowEffects>
 -#include <KWindowSystem>
 -#include <KX11Extras>
  
-@@ -25,4 +22,2 @@ const char ThemePrivate::defaultTheme[] = "default";
+ namespace Plasma
+ {
+ const char ThemePrivate::defaultTheme[] = "default";
  
 -BlurEffectWatcher *ThemePrivate::s_blurEffectWatcher = nullptr;
 -
  ThemePrivate *ThemePrivate::globalTheme = nullptr;
-@@ -80,3 +75,3 @@ ThemePrivate::ThemePrivate(QObject *parent)
+ QHash<QString, ThemePrivate *> ThemePrivate::themes = QHash<QString, ThemePrivate *>();
+ using QSP = QStandardPaths;
+@@ -78,7 +73,7 @@ ThemePrivate::ThemePrivate(QObject *parent)
+     , tooltipColorScheme(QPalette::Active, KColorScheme::Tooltip, KSharedConfigPtr(nullptr))
+     , defaultWallpaperTheme(QStringLiteral(DEFAULT_WALLPAPER_THEME))
      , compositingActive(true)
 -    , backgroundContrastActive(KWindowEffects::isEffectAvailable(KWindowEffects::BackgroundContrast))
 +    , backgroundContrastActive(false)
      , isDefault(true)
-@@ -94,6 +89,2 @@ ThemePrivate::ThemePrivate(QObject *parent)
+     , useGlobal(true)
+     , fixedName(false)
+@@ -92,10 +87,6 @@ ThemePrivate::ThemePrivate(QObject *parent)
+     , apiMinor(0)
+     , apiRevision(0)
  {
 -    if (KWindowSystem::isPlatformX11()) {
 -        compositingActive = KX11Extras::self()->compositingActive();
 -    }
 -
      kSvgImageSet = std::unique_ptr<KSvg::ImageSet>(new KSvg::ImageSet);
-@@ -117,10 +108,2 @@ ThemePrivate::ThemePrivate(QObject *parent)
+     kSvgImageSet->setBasePath(QStringLiteral(PLASMA_RELATIVE_DATA_INSTALL_DIR "/desktoptheme/"));
+ 
+@@ -115,14 +106,6 @@ ThemePrivate::ThemePrivate(QObject *parent)
+     updateNotificationTimer->setInterval(100);
+     QObject::connect(updateNotificationTimer, &QTimer::timeout, this, &ThemePrivate::notifyOfChanged);
  
 -    if (QPixmap::defaultDepth() > 8) {
 -        // watch for background contrast effect property changes as well
@@ -264,13 +505,21 @@ index 6e0e25821..0f548467b 100644
 -        QObject::connect(s_blurEffectWatcher, &BlurEffectWatcher::effectChanged, selectorsUpdateTimer, qOverload<>(&QTimer::start));
 -    }
      QCoreApplication::instance()->installEventFilter(this);
-@@ -137,5 +120,2 @@ ThemePrivate::ThemePrivate(QObject *parent)
+ 
+     plasmaRcWatcher = KConfigWatcher::create(KSharedConfig::openConfig(QStringLiteral("plasmarc")));
+@@ -135,9 +118,6 @@ ThemePrivate::ThemePrivate(QObject *parent)
+         scheduleThemeChangeNotification();
+     });
  
 -    if (KWindowSystem::isPlatformX11()) {
 -        connect(KX11Extras::self(), &KX11Extras::compositingChanged, selectorsUpdateTimer, qOverload<>(&QTimer::start));
 -    }
      updateKSvgSelectors();
-@@ -170,12 +150,4 @@ void ThemePrivate::updateKSvgSelectors()
+ }
+ 
+@@ -168,16 +148,8 @@ KConfigGroup &ThemePrivate::config()
+ 
+ void ThemePrivate::updateKSvgSelectors()
  {
 -#if HAVE_X11
 -    if (KWindowSystem::isPlatformX11()) {
@@ -284,25 +533,39 @@ index 6e0e25821..0f548467b 100644
 -    backgroundContrastActive = s_blurEffectWatcher->isEffectActive();
 +    backgroundContrastActive = false;
  
+     if (compositingActive) {
+         if (backgroundContrastActive) {
 diff --git a/src/plasma/private/theme_p.h b/src/plasma/private/theme_p.h
-index c23b32113..d0012513f 100644
+index c23b321..d001251 100644
 --- a/src/plasma/private/theme_p.h
 +++ b/src/plasma/private/theme_p.h
-@@ -24,4 +24,2 @@
+@@ -22,8 +22,6 @@
+ 
+ #include <config-plasma.h>
  
 -#include "private/blureffectwatcher_p.h"
 -
  namespace Plasma
-@@ -65,4 +63,2 @@ public:
+ {
+ class Theme;
+@@ -63,8 +61,6 @@ Q_SIGNALS:
+ public:
+     static const char defaultTheme[];
  
 -    static BlurEffectWatcher *s_blurEffectWatcher;
 -
      // Ref counting of ThemePrivate instances
+     static ThemePrivate *globalTheme;
+     static QHash<QString, ThemePrivate *> themes;
 diff --git a/src/plasma/theme.cpp b/src/plasma/theme.cpp
-index 6f00e54d5..9f1904b4b 100644
+index 6f00e54..9f1904b 100644
 --- a/src/plasma/theme.cpp
 +++ b/src/plasma/theme.cpp
-@@ -21,3 +21,2 @@
+@@ -19,7 +19,6 @@
+ 
+ #include <KColorScheme>
  #include <KConfigGroup>
 -#include <KWindowEffects>
  #include <QDebug>
+ #include <QStandardPaths>
+ 

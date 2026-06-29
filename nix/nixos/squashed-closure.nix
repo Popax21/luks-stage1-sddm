@@ -52,7 +52,6 @@
         "!${matchPkg "glibc"}/lib/locale/" # - locale archive data
         "${matchPkg "hwdata"}/" # - we don't need hwdata
         "${matchPkg "glib"}/lib/(?!libglib-2.0.so)[^/]+" # - we only need libglib-2.0.so
-        "${matchPkg "systemd-minimal-libs"}/lib/(?!libudev.so)[^/]+" # - we only need udev
         "!${matchPkg "xkeyboard-config"}/etc" # - is a symlink
         "!${matchPkg "mesa"}/lib/gbm/" # - Mesa stuff
 
