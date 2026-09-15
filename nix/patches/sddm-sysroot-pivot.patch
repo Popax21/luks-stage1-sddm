@@ -1,17 +1,38 @@
 diff --git a/src/greeter/GreeterApp.cpp b/src/greeter/GreeterApp.cpp
-index be4f9f0..7eac80e 100644
+index 01613cc..cfed578 100644
 --- a/src/greeter/GreeterApp.cpp
 +++ b/src/greeter/GreeterApp.cpp
-@@ -45,6 +45,8 @@
+@@ -44,7 +44,12 @@
+ #include <QLibraryInfo>
  #include <QVersionNumber>
  #include <QSurfaceFormat>
++#include <qpa/qplatformnativeinterface.h>
  
 +#include <unistd.h>
 +#include <signal.h>
++#include <errno.h>
++#include <sys/ioctl.h>
  #include <iostream>
  
  #define TR(x) QT_TRANSLATE_NOOP("Command line parser", QStringLiteral(x))
-@@ -369,6 +371,13 @@ int main(int argc, char **argv)
+@@ -302,6 +307,16 @@ namespace SDDM {
+     }
+ }
+ 
++static int takeoverHandlerDriFd = -1;
++
++static void onFatalSignal(int sig)
++{
++    // Exit on a fatal memory access signal if our DRI device was lost
++    //  - Mesa handles this poorly and derefs NULL
++    if (ioctl(takeoverHandlerDriFd, 0) != 0 && errno == ENODEV) _exit(0);
++    signal(sig, SIG_DFL);
++}
++
+ int main(int argc, char **argv)
+ {
+     bool testMode = false;
+@@ -369,6 +384,24 @@ int main(int argc, char **argv)
          QCoreApplication::instance()->exit(-1);
      });
  
@@ -20,6 +41,17 @@ index be4f9f0..7eac80e 100644
 +        qInfo("Pivoting into /sysroot");
 +        chdir("/sysroot");
 +        chroot(".");
++
++        QPlatformNativeInterface *nativeInterface = QGuiApplication::platformNativeInterface();
++        void *res = nativeInterface ? nativeInterface->nativeResourceForIntegration(QByteArrayLiteral("dri_fd")) : nullptr;
++        if (res) {
++            takeoverHandlerDriFd = (int)(qintptr) res;
++            signal(SIGSEGV, onFatalSignal);
++            signal(SIGBUS, onFatalSignal);
++            qInfo("Armed DRI takeover handler (fd %d)", takeoverHandlerDriFd);
++        } else {
++            qWarning("Failed to arm DRI takeover handler");
++        }
 +    });
 +
      QCommandLineParser parser;

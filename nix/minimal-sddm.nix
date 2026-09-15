@@ -2,6 +2,7 @@
   lib,
   qt6-minimal,
   kdePackages,
+  libxkbcommon,
 }:
   (kdePackages.sddm.unwrapped.override {
     inherit (qt6-minimal) qtbase qttools qtdeclarative;
@@ -12,7 +13,7 @@
 
       patches = attrs.patches ++ [patches/sddm-sysroot-pivot.patch];
 
-      buildInputs = with qt6-minimal; [qtbase qtdeclarative];
+      buildInputs = with qt6-minimal; [qtbase qtdeclarative libxkbcommon];
 
       cmakeFlags =
         attrs.cmakeFlags
@@ -23,7 +24,7 @@
 
       postPatch = ''
         #Only build the greeter
-        sed -i 's/Core DBus Gui Qml Quick LinguistTools Test QuickTest/Core Gui Qml Quick Network LinguistTools/' CMakeLists.txt
+        sed -i 's/Core DBus Gui Qml Quick LinguistTools Test QuickTest/Core Gui GuiPrivate Qml Quick Network LinguistTools/' CMakeLists.txt
         sed -i '/find_package(PAM REQUIRED)/d' CMakeLists.txt
         sed -i '/find_package(XCB REQUIRED)/d' CMakeLists.txt
         sed -i '/pkg_check_modules(LIBXAU REQUIRED "xau")/d' CMakeLists.txt
@@ -35,6 +36,10 @@
 
         #Fix Qt6::Network dependency (previously it was a transitive dependency of Qt6::Quick, but we disable QML network support)
         sed -i '/Qt''${QT_MAJOR_VERSION}::Quick/a Qt''${QT_MAJOR_VERSION}::Network' src/greeter/CMakeLists.txt
+
+        #Link against QtGui's private headers for the DRI takeover handler
+        sed -i '/Qt''${QT_MAJOR_VERSION}::Quick/a Qt''${QT_MAJOR_VERSION}::GuiPrivate' src/greeter/CMakeLists.txt
+        rm cmake/FindXKB.cmake # - breaks GuiPrivate's resolution
 
         #Load the config file from an env variable
         sed -i '/files << m_path;/a files << qEnvironmentVariable("SDDM_CONFIG");' src/common/ConfigReader.cpp
