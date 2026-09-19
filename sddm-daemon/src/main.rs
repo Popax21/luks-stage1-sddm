@@ -1,4 +1,4 @@
-use std::{os::fd::AsRawFd, path::Path, process::ExitCode, sync::Arc};
+use std::{os::fd::AsRawFd, path::Path, process::ExitCode, sync::Arc, time::Duration};
 
 mod control_server;
 mod failsafe;
@@ -153,10 +153,43 @@ fn main() -> ExitCode {
         )
         .await;
 
+        if failsafe_engaged {
+            eprintln!("bailing on failsafe engagement");
+
+            smol::future::or(
+                async {
+                    _ = greeter.kill();
+                    _ = greeter.status().await;
+                },
+                async {
+                    smol::Timer::after(Duration::from_millis(1500)).await;
+                },
+            )
+            .await;
+
+            return ExitCode::FAILURE;
+        }
+
         //Shutdown password request handling
         pw_req_handler.cancel().await;
 
-        if !failsafe_engaged && let Some(request) = controller.shutdown().await {
+        //Shutdown the greeter control server; this will make the greeter shutdown as well
+        control_server.cancel().await;
+
+        //Wait for the greeter to exit
+        let greeter_status = greeter
+            .status()
+            .await
+            .expect("failed to wait for SDDM greeter");
+
+        if !greeter_status.success() {
+            // - something went wrong; bail out just in case
+            eprintln!("greeter exited with status {greeter_status}");
+            return ExitCode::FAILURE;
+        }
+
+        //Hand off the login request to the proper service if we were processing one
+        if let Some(request) = controller.complete_request().await {
             //We got a pending login request before shutting down; prepare for a handoff to the proper SDDM service
             if sysroot_pivot_task.is_finished() {
                 write_transient_sddm_config(&request, initrd_survives_pivot)
@@ -184,25 +217,7 @@ fn main() -> ExitCode {
             }
         };
 
-        //Shutdown the greeter control server; this will make the greeter shutdown as well
-        control_server.cancel().await;
-
-        //Retrieve the greeter status, unless the failsafe was engaged, then kill it
-        if failsafe_engaged {
-            _ = greeter.kill();
-        }
-
-        let greeter_status = greeter
-            .status()
-            .await
-            .expect("failed to wait for SDDM greeter");
-
-        if greeter_status.success() {
-            ExitCode::SUCCESS
-        } else {
-            eprintln!("greeter exited with status {greeter_status}");
-            ExitCode::FAILURE
-        }
+        ExitCode::SUCCESS
     })
 }
 

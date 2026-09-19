@@ -20,7 +20,6 @@ pub struct LoginController {
 struct LoginState {
     request_rx: smol::channel::Receiver<PasswordRequest>,
     pending_request: Option<PasswordRequest>,
-    processed_ids: HashSet<String>,
     login_request: Option<LoginRequest>,
 }
 
@@ -40,7 +39,6 @@ impl LoginController {
             login_lock: Mutex::new(LoginState {
                 request_rx,
                 pending_request: None,
-                processed_ids: HashSet::new(),
                 login_request: None,
             }),
         }
@@ -88,8 +86,8 @@ impl LoginController {
             .expect("failed to queue password request");
     }
 
-    pub async fn shutdown(&self) -> Option<LoginRequest> {
-        self.request_tx.close();
+    pub async fn complete_request(&self) -> Option<LoginRequest> {
+        assert!(self.request_tx.close());
         self.login_lock.lock().await.login_request.take()
     }
 }
@@ -103,42 +101,55 @@ impl GreeterController for LoginController {
         mut msg_sender: impl FnMut(&str),
     ) -> bool {
         let mut state = self.login_lock.lock().await;
+        let state = &mut *state;
 
-        //Receive a request to process, or if we already have a request from the last failed login attempt, process that
-        while let Ok(req) = match state.pending_request.take() {
-            Some(r) => Ok(r),
-            None => state.request_rx.recv().await,
-        } {
-            //Check if we processed this request already; if yes, then the password wasn't correct, so bail
-            let id = req.id.as_ref().unwrap();
-            if !state.processed_ids.insert(id.clone()) {
-                eprintln!("got another password request from {id}; login failed");
-                msg_sender(&format!("failed to unlock {id}"));
-
-                state.processed_ids.clear();
-                state.pending_request = Some(req);
-                return false;
-            }
-
-            //Answer the request
-            println!("responding to password request from {id}");
-
-            //Prefix the slot key with `<user>#` to bind the LUKS slot to a specific user identity
-            let slot_key = Zeroizing::new(format!("{user}#{}", &*password).into_boxed_str());
-
-            if let Err(err) = req.reply(Some(slot_key)) {
-                eprintln!("failed to reply to password request: {err:#}")
-            }
-        }
-
-        //The transmitting end was closed; this means that the unlock was successful / we're shutting down
-        state.login_request = Some(LoginRequest {
+        //Stash the login request so we can hand it over as part of the shutdown sequence
+        // - do this right away since the greeter can shut down before us, which cancels this Future early
+        let LoginRequest { password, .. } = state.login_request.insert(LoginRequest {
             user: user.to_owned(),
             password,
             session: session.to_owned(),
         });
 
-        true
+        //Process password requests
+        let mut processed_ids = HashSet::<String>::new();
+
+        loop {
+            //Process the currently pending request
+            let req = match &state.pending_request {
+                Some(req) => req,
+                None => {
+                    //We have no stashed request, so receive a new request to process
+                    if let Ok(req) = state.request_rx.recv().await {
+                        &*state.pending_request.insert(req)
+                    } else {
+                        //The transmitting end was closed; this means that the unlock was successful / we're shutting down
+                        return true;
+                    }
+                }
+            };
+
+            //Check if we processed this request already; if yes, then the password wasn't correct, so bail
+            let id = req.id.as_ref().unwrap();
+            if !processed_ids.insert(id.clone()) {
+                eprintln!("got another password request from {id}; login failed");
+                msg_sender(&format!("failed to unlock {id}"));
+
+                state.login_request = None;
+                return false;
+            }
+
+            //Answer the request
+            // - prefix the slot key with `<user>#` to bind the LUKS slot to a specific user identity
+            let slot_key = Zeroizing::new(format!("{user}#{}", &**password).into_boxed_str());
+
+            println!("responding to password request from {id}");
+
+            let req = state.pending_request.take().unwrap();
+            if let Err(err) = req.reply(Some(slot_key)) {
+                eprintln!("failed to reply to password request: {err:#}")
+            }
+        }
     }
 
     fn can_perform_power_action(&self, act: PowerAction) -> bool {
