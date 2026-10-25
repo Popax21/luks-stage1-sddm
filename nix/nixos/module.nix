@@ -1,5 +1,6 @@
 {
   config,
+  options,
   lib,
   pkgs,
   ...
@@ -236,8 +237,8 @@ in {
 
     boot.initrd = {
       systemd = {
-        #We need stage 1 systemd for any of this to work
-        enable = true;
+        #We need stage 1 systemd for any of this to work (forced on by default on modern NixOS versions)
+        enable = lib.mkIf (options.boot.initrd.systemd.enable.type.name == "bool") true;
 
         #Setup the SDDM service
         services.luks-sddm = {
