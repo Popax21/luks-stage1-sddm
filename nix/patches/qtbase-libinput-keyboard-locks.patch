@@ -1,0 +1,193 @@
+diff --git a/src/platformsupport/input/libinput/qlibinputhandler.cpp b/src/platformsupport/input/libinput/qlibinputhandler.cpp
+index ef45533..7b0e643 100644
+--- a/src/platformsupport/input/libinput/qlibinputhandler.cpp
++++ b/src/platformsupport/input/libinput/qlibinputhandler.cpp
+@@ -135,6 +135,7 @@ void QLibInputHandler::processEvent(libinput_event *ev)
+             inputManagerPriv->setDeviceCount(QInputDeviceManager::DeviceTypePointer, count);
+         }
+         if (libinput_device_has_capability(dev, LIBINPUT_DEVICE_CAP_KEYBOARD)) {
++            m_keyboard->registerDevice(dev);
+             int &count(m_devCount[QInputDeviceManager::DeviceTypeKeyboard]);
+             ++count;
+             inputManagerPriv->setDeviceCount(QInputDeviceManager::DeviceTypeKeyboard, count);
+@@ -157,6 +158,7 @@ void QLibInputHandler::processEvent(libinput_event *ev)
+             inputManagerPriv->setDeviceCount(QInputDeviceManager::DeviceTypePointer, count);
+         }
+         if (libinput_device_has_capability(dev, LIBINPUT_DEVICE_CAP_KEYBOARD)) {
++            m_keyboard->unregisterDevice(dev);
+             int &count(m_devCount[QInputDeviceManager::DeviceTypeKeyboard]);
+             --count;
+             inputManagerPriv->setDeviceCount(QInputDeviceManager::DeviceTypeKeyboard, count);
+diff --git a/src/platformsupport/input/libinput/qlibinputkeyboard.cpp b/src/platformsupport/input/libinput/qlibinputkeyboard.cpp
+index c8be7ee..b7b9c70 100644
+--- a/src/platformsupport/input/libinput/qlibinputkeyboard.cpp
++++ b/src/platformsupport/input/libinput/qlibinputkeyboard.cpp
+@@ -16,13 +16,18 @@
+ 
+ QT_BEGIN_NAMESPACE
+ 
++using namespace Qt::StringLiterals;
++
+ #if QT_CONFIG(xkbcommon)
+ const int REPEAT_DELAY = 500;
+ const int REPEAT_RATE = 100;
+ #endif
+ 
+ QLibInputKeyboard::QLibInputKeyboard()
++    : QInputDevice("libinput keyboard"_L1, 0, QInputDevice::DeviceType::Keyboard)
+ {
++    QWindowSystemInterface::registerInputDevice(this);
++
+ #if QT_CONFIG(xkbcommon)
+     qCDebug(qLcLibInput) << "Using xkbcommon for key mapping";
+     m_ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+@@ -60,6 +65,17 @@ QLibInputKeyboard::~QLibInputKeyboard()
+ #endif
+ }
+ 
++void QLibInputKeyboard::registerDevice(libinput_device *dev)
++{
++    m_devices.append(dev);
++    libinput_device_led_update(dev, libinput_led(ledState()));
++}
++
++void QLibInputKeyboard::unregisterDevice(libinput_device *dev)
++{
++    m_devices.removeOne(dev);
++}
++
+ void QLibInputKeyboard::processKey(libinput_event_keyboard *e)
+ {
+ #if QT_CONFIG(xkbcommon)
+@@ -78,7 +94,16 @@ void QLibInputKeyboard::processKey(libinput_event_keyboard *e)
+     const QString text = QXkbCommon::lookupString(m_state, keycode);
+     const int qtkey = QXkbCommon::keysymToQtKey(sym, modifiers, m_state, keycode);
+ 
+-    xkb_state_update_key(m_state, keycode, pressed ? XKB_KEY_DOWN : XKB_KEY_UP);
++    const xkb_state_component changed =
++        xkb_state_update_key(m_state, keycode, pressed ? XKB_KEY_DOWN : XKB_KEY_UP);
++
++    if (changed & XKB_STATE_LEDS) {
++        const libinput_led leds = libinput_led(ledState());
++        for (libinput_device *dev : std::as_const(m_devices))
++            libinput_device_led_update(dev, leds);
++
++        emit lockStateChanged();
++    }
+ 
+     Qt::KeyboardModifiers modifiersAfterStateChange = QXkbCommon::modifiers(m_state, sym);
+     QGuiApplicationPrivate::inputDeviceManager()->setKeyboardModifiers(modifiersAfterStateChange);
+@@ -106,7 +131,34 @@ void QLibInputKeyboard::processKey(libinput_event_keyboard *e)
+ #endif
+ }
+ 
++int QLibInputKeyboard::ledState() const
++{
++    int leds = 0;
++    if (capsLock())
++        leds |= LIBINPUT_LED_CAPS_LOCK;
++    if (numLock())
++        leds |= LIBINPUT_LED_NUM_LOCK;
++    if (scrollLock())
++        leds |= LIBINPUT_LED_SCROLL_LOCK;
++    return leds;
++}
++
+ #if QT_CONFIG(xkbcommon)
++bool QLibInputKeyboard::capsLock() const
++{
++    return m_state && xkb_state_led_name_is_active(m_state, XKB_LED_NAME_CAPS) > 0;
++}
++
++bool QLibInputKeyboard::numLock() const
++{
++    return m_state && xkb_state_led_name_is_active(m_state, XKB_LED_NAME_NUM) > 0;
++}
++
++bool QLibInputKeyboard::scrollLock() const
++{
++    return m_state && xkb_state_led_name_is_active(m_state, XKB_LED_NAME_SCROLL) > 0;
++}
++
+ void QLibInputKeyboard::handleRepeat()
+ {
+     QWindowSystemInterface::handleExtendedKeyEvent(nullptr, QEvent::KeyPress,
+@@ -117,6 +169,23 @@ void QLibInputKeyboard::handleRepeat()
+     m_repeatTimer.setInterval(REPEAT_RATE);
+     m_repeatTimer.start();
+ }
++#else
++bool QLibInputKeyboard::capsLock() const
++{
++    return false;
++}
++
++bool QLibInputKeyboard::numLock() const
++{
++    return false;
++}
++
++bool QLibInputKeyboard::scrollLock() const
++{
++    return false;
++}
+ #endif
+ 
+ QT_END_NAMESPACE
++
++#include "moc_qlibinputkeyboard_p.cpp"
+diff --git a/src/platformsupport/input/libinput/qlibinputkeyboard_p.h b/src/platformsupport/input/libinput/qlibinputkeyboard_p.h
+index fecbca3..df6bdd2 100644
+--- a/src/platformsupport/input/libinput/qlibinputkeyboard_p.h
++++ b/src/platformsupport/input/libinput/qlibinputkeyboard_p.h
+@@ -6,6 +6,7 @@
+ 
+ #include <QtCore/QPoint>
+ #include <QtCore/QTimer>
++#include <QtGui/QInputDevice>
+ 
+ #include <QtGui/private/qtguiglobal_p.h>
+ 
+@@ -24,19 +25,41 @@
+ // We mean it.
+ //
+ 
++struct libinput_device;
+ struct libinput_event_keyboard;
+ 
+ QT_BEGIN_NAMESPACE
+ 
+-class QLibInputKeyboard : public QObject
++class QLibInputKeyboard : public QInputDevice
+ {
++    Q_OBJECT
++
++    Q_PROPERTY(int ledState READ ledState NOTIFY lockStateChanged)
++    Q_PROPERTY(bool capsLock READ capsLock NOTIFY lockStateChanged)
++    Q_PROPERTY(bool numLock READ numLock NOTIFY lockStateChanged)
++    Q_PROPERTY(bool scrollLock READ scrollLock NOTIFY lockStateChanged)
++
+ public:
+     QLibInputKeyboard();
+     ~QLibInputKeyboard();
+ 
++    void registerDevice(libinput_device *dev);
++    void unregisterDevice(libinput_device *dev);
+     void processKey(libinput_event_keyboard *e);
+ 
++    int ledState() const;
++    bool capsLock() const;
++    bool numLock() const;
++    bool scrollLock() const;
++
++signals:
++    void lockStateChanged();
++
++private:
++    QList<libinput_device *> m_devices;
++
+ #if QT_CONFIG(xkbcommon)
++public:
+     void handleRepeat();
+ 
+ private:

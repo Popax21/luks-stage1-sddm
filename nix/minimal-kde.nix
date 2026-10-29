@@ -29,6 +29,7 @@ in
       buildInputs = (old.buildInputs or []) ++ [util-linux.dev];
     });
     kguiaddons = prev.kguiaddons.overrideAttrs (old: {
+      patches = (old.patches or []) ++ [patches/kguiaddons-libinput-lock-keys.patch];
       cmakeFlags = (old.cmakeFlags or []) ++ ["-DUSE_DBUS=OFF" "-DWITH_X11=OFF" "-DWITH_WAYLAND=OFF" "-DBUILD_PYTHON_BINDINGS=OFF"];
     });
     kirigami = prev.kirigami.unwrapped.overrideAttrs (old: {

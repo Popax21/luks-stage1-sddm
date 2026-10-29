@@ -1,0 +1,67 @@
+diff --git a/src/util/kmodifierkeyinfo.cpp b/src/util/kmodifierkeyinfo.cpp
+index 158beb2..a1aca54 100644
+--- a/src/util/kmodifierkeyinfo.cpp
++++ b/src/util/kmodifierkeyinfo.cpp
+@@ -9,6 +9,8 @@
+ #include <kguiaddons_debug.h>
+ 
+ #include <QGuiApplication>
++#include <QInputDevice>
++#include <QPointer>
+ 
+ #include "config.h"
+ 
+@@ -20,6 +22,32 @@
+ #include "kmodifierkeyinfoprovider_xcb.h"
+ #endif
+ 
++class KModifierKeyInfoProviderLibInput : public KModifierKeyInfoProvider
++{
++    Q_OBJECT
++public:
++    explicit KModifierKeyInfoProviderLibInput(const QInputDevice *keyboard)
++        : m_keyboard(keyboard)
++    {
++        updateLockStates();
++        connect(keyboard, SIGNAL(lockStateChanged()), this, SLOT(updateLockStates()));
++    }
++
++private:
++    Q_SLOT void updateLockStates()
++    {
++        if (!m_keyboard) {
++            return;
++        }
++
++        stateUpdated(Qt::Key_CapsLock, m_keyboard->property("capsLock").toBool() ? Locked : Nothing);
++        stateUpdated(Qt::Key_NumLock, m_keyboard->property("numLock").toBool() ? Locked : Nothing);
++        stateUpdated(Qt::Key_ScrollLock, m_keyboard->property("scrollLock").toBool() ? Locked : Nothing);
++    }
++
++    QPointer<const QInputDevice> m_keyboard;
++};
++
+ KModifierKeyInfoProvider *createProvider()
+ {
+ #if WITH_WAYLAND
+@@ -34,6 +62,15 @@ KModifierKeyInfoProvider *createProvider()
+     }
+ #endif
+ 
++    const auto devices = QInputDevice::devices();
++    for (const QInputDevice *device : devices) {
++        if (device->type() == QInputDevice::DeviceType::Keyboard
++            && device->inherits("QLibInputKeyboard")
++            && device->metaObject()->indexOfSignal("lockStateChanged()") >= 0) {
++            return new KModifierKeyInfoProviderLibInput(device);
++        }
++    }
++
+     qCWarning(KGUIADDONS_LOG) << "No modifierkeyinfo backend for platform" << qGuiApp->platformName();
+     return new KModifierKeyInfoProvider;
+ }
+@@ -95,3 +132,4 @@ bool KModifierKeyInfo::isButtonPressed(Qt::MouseButton button) const
+ }
+ 
+ #include "moc_kmodifierkeyinfo.cpp"
++#include "kmodifierkeyinfo.moc"

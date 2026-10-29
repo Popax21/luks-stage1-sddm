@@ -26,7 +26,7 @@
     pname = "qtbase-minimal";
     inherit (qt6.srcs.qtbase) version src;
 
-    patches = qt6.qtbase.patches ++ [patches/qtbase-linuxfb-platform-theme.patch];
+    patches = qt6.qtbase.patches ++ [patches/qtbase-linuxfb-platform-theme.patch patches/qtbase-libinput-keyboard-locks.patch];
 
     strictDeps = true;
     enableParallelBuilding = true;
@@ -166,7 +166,7 @@
         "quickshapes_designhelpers"
 
         # "quickcontrols2_basic"
-         # "quickcontrols2_fusion" # - needed by Breeze
+        # "quickcontrols2_fusion" # - needed by Breeze
         "quickcontrols2_stylekit"
         "quickcontrols2_universal"
         # "quickcontrols2_material" # - needed by Kirigami
